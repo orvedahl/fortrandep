@@ -1,0 +1,17 @@
+
+Python tool to determine Makefile dependencies for a Fortran project.
+
+Based heavily on: https://github.com/ZedThree/fort_depend.py
+
+This version uses a very basic custom preprocessor written in Python; it
+does not handle every possible directive. The most important directive that
+it handles is conditional use statements. For example, conditionally
+importing the module named "my_hooks" using a preprocessor directive
+would look like this:
+
+#ifdef USE_HOOKS
+    use my_hooks
+#endif
+
+If the USE_HOOKS directive is defined, then this has important implications
+for the Makefile dependencies.
