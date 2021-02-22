@@ -24,6 +24,13 @@ USE_REGEX = re.compile(r"""^\s*use
 \s*(, )?\s*(only)?\s*(:)?.*?$         # Stuff that might follow the name
 """,
                        re.IGNORECASE | re.VERBOSE)
+# catch the cases:
+#     include "filename"
+#     include 'filename'
+#     this will also catch: include "filename', but that won't compile
+#     filename can include an extension, e.g., "mpi.h" or "mpi" or "indices.F"
+INC_REGEX = re.compile(r"""^\s*include\s+(\'|\")(?P<filename>\w+\.*\w+)?(\'|\")""",
+                       re.IGNORECASE)
 
 class FortranFile:
     """
@@ -59,8 +66,8 @@ class FortranFile:
             raise FileNotFoundError("File does not exist or is not a file: {}".format(filename))
 
         self.filename = filename
-        self.uses = None    # will be a list of modules USEd by this file
-        self.modules = None # will be a dict of FortranModule objects
+        self.uses = None     # will be a list of modules USEd by this file
+        self.modules = None  # will be a dict of FortranModule objects
 
         if (readfile):
             with open(self.filename, 'r') as f: # read file contents into list
@@ -71,35 +78,14 @@ class FortranFile:
                         continue
                     if (line.lstrip().startswith("#")): # track if any macros are used
                         need_preprocess = True
+
                     contents.append(f.readline())
 
             if (need_preprocess and use_preprocessor):
 
-                preprocessor = FortranPreprocessor() # build the preprocessor
+                # build the preprocessor and parse the file
+                preprocessor = FortranPreprocessor(macros=macros, search_paths=pp_search_path)
 
-                # unpack user-defined macros and add them to the preprocessor
-                if (macros is not None):
-                    if (isinstance(macros, dict)):
-                        for k, v in macros.items():
-                            preprocessor.define("{} {}".format(k, v))
-                    else:
-                        if (not isinstance(macros, list)):
-                            macros = [macros]
-                        for macro in macros:
-                            if ("=" in macro):
-                                temp = macro.split("=")
-                                preprocessor.define("{} {}".format(temp[0], temp[1]))
-                            else:
-                                preprocessor.define(macro)
-
-                # add user-defined preprocessor search paths
-                if (pp_search_path is not None):
-                    if (not isinstance(pp_search_path, list)):
-                        pp_search_path = [pp_search_path]
-                    for include_dir in pp_search_path:
-                        preprocessor.add_path(include_dir)
-
-                # run the preprocessor
                 contents = preprocessor.parse(contents)
 
             # parse file for modules and use statements
@@ -155,7 +141,7 @@ class FortranFile:
                 # build/store the module/program object
                 contains[name] = FortranModule(unit_type=unit.group('unit_type'),
                                                name=name,
-                                               source_file=self,
+                                               source_file=self, # source file is the current object
                                                text=(contents, start, end),
                                                macros=macros)
         return contains
@@ -205,7 +191,7 @@ class FortranModule:
             The source file that holds the module/program
         text : tuple
             Tuple containing (contents of source file, start index, end index). The entire
-            module/program would be contained within contents[start:end]
+            module/program would be contained within contents[start:end+1]
         macros : dict
             Any defined macros
         """
@@ -247,7 +233,7 @@ class FortranModule:
         """
         uses = []
 
-        for line in contents[self._defined_at:self._end]: # loop over module/program definition
+        for line in contents[self._defined_at:self._end+1]: # loop over module/program definition
             found = re.match(USE_REGEX, line)
             if (found):
                 uses.append(found.group('moduse').strip()) # store the module name that is USEd

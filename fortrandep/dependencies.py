@@ -337,7 +337,7 @@ class FortranProject:
 
         Returns
         -------
-        files : list
+        state : list
             List of module names
         """
         for module in self.modules[module_name].uses:
