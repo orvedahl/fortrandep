@@ -62,8 +62,12 @@ class FortranFile:
         use_preprocessor : bool
             Preprocess the source file
         """
-        if (not os.path.isfile(filename)):
-            raise FileNotFoundError("File does not exist or is not a file: {}".format(filename))
+        if (filename is not None): # only error trap non-None filenames
+            if (not os.path.isfile(filename)):
+                raise FileNotFoundError("File does not exist or is not a file: {}".format(filename))
+        else:
+            # filename was specified as None, do not process it
+            readfile = False
 
         self.filename = filename
         self.uses = None     # will be a list of modules USEd by this file
@@ -126,7 +130,7 @@ class FortranFile:
             if (unit):
                 found_units.append(unit) # store the regex result
                 starts.append(num)       # store the starting line index
-            if (end)
+            if (end):
                 ends.append(num)         # store the ending line index
 
         if (found_units): # there are module/program definitions
@@ -207,7 +211,14 @@ class FortranModule:
             self.uses = self.get_uses(text[0], macros=macros)
 
         else:
-            self.source_file = FortranFile(filename='empty', readfile=False)
+            self.source_file = FortranFile(filename=None, readfile=False)
+
+            self._defined_at = 0 # definition start/end was not given, default to all
+            self._end = None
+
+            # USEd statements will presumably be found later with an explicit call to get_uses
+            # so for now, define the attribute with a placeholder value
+            self.uses = None
 
     def __str__(self):
         return self.name
@@ -215,7 +226,7 @@ class FortranModule:
     def __repr__(self):
         return "FortranModule({}, '{}, '{}')".format(self.unit_type, self.name, self.source_file.filename)
 
-    def get_uses(self, contents, macros=None)
+    def get_uses(self, contents, macros=None):
         """
         Find all instances of USE statements
 
@@ -233,7 +244,8 @@ class FortranModule:
         """
         uses = []
 
-        for line in contents[self._defined_at:self._end+1]: # loop over module/program definition
+        # loop over module/program definition, but skip "end module/program ..." line
+        for line in contents[self._defined_at:self._end]:
             found = re.match(USE_REGEX, line)
             if (found):
                 uses.append(found.group('moduse').strip()) # store the module name that is USEd

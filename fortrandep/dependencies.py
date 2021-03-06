@@ -58,7 +58,7 @@ class FortranProject:
 
         if (files is None):
             files = self.get_source(search_dirs, extensions)
-        elif (not isinstance(files, list):
+        elif (not isinstance(files, list)):
             files = [os.path.abspath(files)]
         else:
             files = [os.path.abspath(f) for f in files]
@@ -239,7 +239,7 @@ class FortranProject:
 
         return depends
 
-    def write_dependencies(self, output, overwrite=False build=None, skip_programs=False):
+    def write_dependencies(self, output, overwrite=False, build=None, skip_programs=False):
         """
         Write dependencies to file
 
@@ -261,11 +261,11 @@ class FortranProject:
         def _format_dependencies(target, target_ext, dep_list):
             _, filename = os.path.split(target)
             target_name = os.path.splitext(filename)[0] + target_ext
-            listing = "\n{} : ".format(os.path.join(build, target_name)
+            listing = "\n{} : ".format(os.path.join(build, target_name))
             for dep in dep_list:
                 _, depfilename = os.path.split(dep)
                 depobjectname = os.path.splitext(depfilename)[0] + target_ext
-                listing += " \\\n\t{}".format(os.path.join(build, depobjectname)
+                listing += " \\\n\t{}".format(os.path.join(build, depobjectname))
             listing += "\n"
             return listing
 
