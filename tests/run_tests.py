@@ -4,6 +4,7 @@ Run all the test problems
 from __future__ import print_function
 import os
 import sys
+from collections import OrderedDict
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from fortrandep import FortranProject
 
@@ -52,11 +53,27 @@ def parse_input(tdir):
 
 def main():
 
-    test_dirs = ["test-1", "test-2", "test-3", "test-4", "test-5", "test-6"]
     search_paths = ["include"]
 
+    tests = OrderedDict() # key is directory, value is dictionary of test parameters
+
+    tests["test-1"] = {}
+    tests["test-2"] = {}
+    tests["test-3"] = {}
+    tests["test-4"] = {}
+    tests["test-5"] = {}
+    tests["test-6"] = {}
+    tests["test-7"] = {"build":"_build/debug/odir"}
+    tests["test-8"] = {"build":"build"}
+    tests["pp-test-9"] = {"build":"odir"}
+    tests["pp-test-10"] = {"build":"odir"}
+    tests["pp-test-11"] = {"build":"odir"}
+    tests["pp-test-12"] = {"build":"odir"}
+    tests["pp-test-13"] = {"build":"odir"}
+
     passed = 0
-    for tdir in test_dirs:
+    n_tests = len(tests.keys())
+    for tdir in tests.keys():
         print("Running: ", end='')
         print_color("{}".format(tdir), "bold")
 
@@ -68,7 +85,8 @@ def main():
                            ignore_modules=ignores, macros=macros,
                            pp_search_path=search_paths, verbose=True)
 
-        P.write_dependencies(os.path.join(tdir, "depends.mak"), overwrite=True)
+        build = tests[tdir].pop("build", None)
+        P.write_dependencies(os.path.join(tdir, "depends.mak"), overwrite=True, build=build)
 
         if (P.success):
             print("\t",end=''); print_color("Pass", "green")
@@ -77,7 +95,7 @@ def main():
             print("\t",end=''); print_color("Fail", "green")
 
     print("\nSuccessful tests: {}".format(passed))
-    print("Total tests run : {}\n".format(len(test_dirs)))
+    print("Total tests run : {}\n".format(n_tests))
 
 if __name__ == "__main__":
     main()

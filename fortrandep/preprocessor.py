@@ -206,7 +206,7 @@ class FortranPreprocessor:
                 first = False
                 continue
 
-            if (not line.lstrip.startswith("#")): # skip all other directives...very basic
+            if (not line.lstrip().startswith("#")): # skip all other directives...very basic
                 if (first):
                     first_block.append(Line)
                 else:
@@ -242,7 +242,7 @@ class FortranPreprocessor:
             if (line.lstrip().startswith("#") and "include" in line): # include directive
                 ind = line.find("include")
                 name = Line[ind+len("include"):].strip() # get the included filename
-                if (name.startswith('"') or name.startswith('"')): # remove quotes
+                if (name.startswith("'") or name.startswith('"')): # remove quotes
                     name = name[1:-1]
 
                 # find the filename in the search paths

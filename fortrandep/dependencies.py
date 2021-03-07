@@ -287,6 +287,23 @@ class FortranProject:
         """
         Write out the makefile line "target : dependencies"
 
+        As an example, if the following items are passed:
+                target = "src/variables.f90"
+                target_ext = ".o"
+                dep_list = ["src/data_types.f90", "grids.f90"]
+
+            using build = None and program = False will produce:
+                src/variables.o : src/data_types.o grids.o src/variables.f90
+
+            using build = "odir" and program = False will produce:
+                odir/variables.o : odir/data_types.o odir/grids.o src/variables.f90
+
+            when program=True, target now specifies the executable name, target="xvars":
+                using build = None will produce:
+                    xvars : src/data_types.o grids.o src/variables.o
+                using build = "odir" will produce:
+                    xvars : odir/data_types.o odir/grids.o odir/variables.o
+
         Args
         ----
         target : str
@@ -305,9 +322,14 @@ class FortranProject:
         listing : str
             The formatted makefile rule, ready to write to the file
         """
-        name = os.path.splitext(target)[0] + target_ext # full path, change ext
+        if (not program):
+            name = os.path.splitext(target)[0] + target_ext # full path, change ext
+            if (build is not None):
+                name = os.path.join(build, os.path.split(name)[1]) # change path
+        else:
+            name = target # executable name will be unaltered
 
-        # remove duplicate depenencies: use two modules defined in same file
+        # remove duplicate depenencies, e.g., could use two modules defined in same file
         udep_list = []
         for x in dep_list:
             if (x not in udep_list):
@@ -320,17 +342,16 @@ class FortranProject:
         # make each dependency an object file extension
         dep_list = [os.path.splitext(i)[0] + target_ext for i in udep_list]
 
-        # build rule using full path of target and dependency list
-        # also include original path of file name
+        # build rule for target using dependency list
         listing = "{} : ".format(name) + " ".join(dep_list)
         if (program):
             listing += "\n"
         else:
-            listing += " {}\n".format(target)
+            listing += " {}\n".format(target) # original path/ext only included for modules
 
         return listing
 
-    def write_dependencies(self, output, overwrite=False, build=None, skip_programs=True):
+    def write_dependencies(self, output, overwrite=False, build=None, skip_programs=False):
         """
         Write dependencies to file
 
@@ -355,17 +376,28 @@ class FortranProject:
         with open(output, 'w') as mf:
             mf.write(HEADER)
 
-            keys = self.depends_by_file.keys()
-            for f in keys:
-                dep_list = [dep.filename for dep in self.depends_by_file[f]] # get filenames
+            # loop over all files and extract the files on which it depends.
+            # the dependency list will not include the current file: that is added
+            # in the _format_dependencies routine
+            for f in self.depends_by_file.keys():
+                dep_list = [dep.filename for dep in self.depends_by_file[f]]
                 listing = self._format_dependencies(f, ".o", dep_list, build=build)
                 mf.write(listing)
 
             if (not skip_programs):
+                # loop over all programs and extract all files on which it depends.
+                # here we manually include the current file, because the executable
+                # name is provided instead of the filename
                 for program in self.programs.keys(): # write out dependencies for programs
-                    program_deps = self.get_all_used_files(program)
-                    exec_name = self.exec_names[program]
-                    listing = self._format_dependencies(exec_name, "", dep_list, program=True)
+                    dep_list = self.get_all_used_files(program)
+
+                    # manually include current file last
+                    dep_list.append(self.programs[program].source_file.filename)
+
+                    exec_name = self.exec_names[program] # extract executable name
+
+                    listing = self._format_dependencies(exec_name, ".o", dep_list,
+                                                        program=True, build=build)
                     mf.write(listing)
 
     def get_all_used_files(self, module_name):
