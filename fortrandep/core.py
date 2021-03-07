@@ -4,6 +4,7 @@ Main classes that define files and modules
 from __future__ import print_function
 import re
 import os
+from .preprocessor import FortranPreprocessor
 
 # catch the case:
 #     "module modname" or "program modname", but not "module procedure ..."
@@ -47,24 +48,26 @@ class FortranFile:
         the values are a FortranModule object
     """
 
-    def __init__(self, filename, macros=None, readfile=True, pp_search_path=None, use_preprocessor=True):
+    def __init__(self, filename=None, readfile=True,
+                 macros=None, pp_search_path=None, use_preprocessor=True):
         """
         Args
         ----
         filename : str
             The filename
-        macros : iterable
-            Dictionary of preprocessor macros to be expanded
         readfile : bool
             Read and process the file
+        macros : list
+            Collection of macro definitions
         pp_search_path : list or str
             List of directories to add to preprocessor search path
         use_preprocessor : bool
             Preprocess the source file
         """
-        if (filename is not None): # only error trap non-None filenames
+        if (filename is not None): # only error trap filenames that were provided
             if (not os.path.isfile(filename)):
-                raise FileNotFoundError("File does not exist or is not a file: {}".format(filename))
+                e = "File does not exist or is not a file: {}".format(filename)
+                raise FileNotFoundError(e)
         else:
             # filename was specified as None, do not process it
             readfile = False
@@ -76,21 +79,24 @@ class FortranFile:
         if (readfile):
             with open(self.filename, 'r') as f: # read file contents into list
                 contents = []
-                need_preprocess = False
+                has_directives = False
                 for line in f:
-                    if (line.lstrip().startswith("!") or (line.strip() == "")): # skip comments/empty lines
+                    if (line.lstrip().startswith("!") or (line.strip() == "")):
+                        # skip comments/empty lines
                         continue
+
                     if (line.lstrip().startswith("#")): # track if any macros are used
-                        need_preprocess = True
+                        has_directives = True
 
                     contents.append(f.readline())
 
-            if (need_preprocess and use_preprocessor):
+            # only preprocess if asked to & there are directives to parse
+            if (has_directives and use_preprocessor):
 
                 # build the preprocessor and parse the file
                 preprocessor = FortranPreprocessor(macros=macros, search_paths=pp_search_path)
 
-                contents = preprocessor.parse(contents)
+                contents = preprocessor.parse(contents) # run the preprocessor
 
             # parse file for modules and use statements
             self.modules = self.get_modules(contents)
@@ -102,7 +108,7 @@ class FortranFile:
     def __repr__(self):
         return "FortranFile('{}')".format(self.filename)
 
-    def get_modules(self, contents, macros=None):
+    def get_modules(self, contents):
         """
         Find all modules or programs that are defined in this file
 
@@ -110,8 +116,6 @@ class FortranFile:
         ----
         contents : list
             Contents of the source file
-        macros : dict
-            Any defined macros
 
         Returns
         -------
@@ -134,20 +138,18 @@ class FortranFile:
                 ends.append(num)         # store the ending line index
 
         if (found_units): # there are module/program definitions
-            if ((len(found_units) != len(starts)) or (len(starts) != len(ends))): # mismatch start/end
+            if ((len(found_units) != len(starts)) or (len(starts) != len(ends))):
                 err = "Unmatched start/end of modules in {} ({} begins/{} ends)"
                 raise ValueError(err.format(self.filename, len(starts), len(ends)))
 
             # loop over found matches
             for unit, start, end in zip(found_units, starts, ends):
-                name = unit.group('modname') # extract the actual module/program name
+                name = unit.group('modname').lower() # extract the actual module/program name
 
                 # build/store the module/program object
-                contains[name] = FortranModule(unit_type=unit.group('unit_type'),
-                                               name=name,
-                                               source_file=self, # source file is the current object
-                                               text=(contents, start, end),
-                                               macros=macros)
+                contains[name] = FortranModule(unit_type=unit.group('unit_type').lower(),
+                                        name=name, source=contents[start:end+1],
+                                        source_file=self) # source file is current object
         return contains
 
     def get_uses(self):
@@ -162,8 +164,13 @@ class FortranFile:
         if (self.modules is None):
             uses = []
         else:
-            # get list of uses for each module and make it unique, then sort it
-            uses = sorted(set([mod for module in self.modules.values() for mod in module.uses]))
+            uses = []
+            for mod in self.modules.keys():
+                module = self.modules[mod]
+                for m in module.uses:
+                    uses.append(m)
+
+            uses = list(set(uses)).sort() # sort results and make it unique
 
         return uses
 
@@ -177,13 +184,11 @@ class FortranModule:
         Specifies if this is a module or a program
     name : str
         Name of the module/program
-    source_file : FortranFile
-        The source file that holds the module/program, not needed unless printing information
     uses : list
         Collection of module names that this module/program USEs
     """
 
-    def __init__(self, unit_type, name, source_file=None, text=None, macros=None):
+    def __init__(self, unit_type, name, source=None, source_file=None):
         """
         Args
         ----
@@ -191,51 +196,41 @@ class FortranModule:
             Specifies if this is a module or a program
         name : str
             Name of the module/program
-        source_file : str
-            The source file that holds the module/program
-        text : tuple
-            Tuple containing (contents of source file, start index, end index). The entire
-            module/program would be contained within contents[start:end+1]
-        macros : dict
-            Any defined macros
+        source : list, optional
+            Source code that defines this module/program
+        source_file : str, optional
+            A FortranFile object describing the source file
         """
         self.unit_type = unit_type.strip().lower()
         self.name = name.strip().lower()
 
-        if (source_file is not None):
-            self.source_file = source_file
-            self._defined_at = text[1]
-            self._end = text[2]
+        self.uses = []
+        self.contents = None
 
-            # find the USEd statements in this module/program
-            self.uses = self.get_uses(text[0], macros=macros)
+        self.source_file = source_file # try to grab the parent filename
+        try:
+            self.parent_file = self.source_file.filename
+        except:
+            self.parent_file = None
 
-        else:
-            self.source_file = FortranFile(filename=None, readfile=False)
-
-            self._defined_at = 0 # definition start/end was not given, default to all
-            self._end = None
-
-            # USEd statements will presumably be found later with an explicit call to get_uses
-            # so for now, define the attribute with a placeholder value
-            self.uses = None
+        if (source is not None):
+            self.uses = self.get_uses(source)
 
     def __str__(self):
         return self.name
 
     def __repr__(self):
-        return "FortranModule({}, '{}, '{}')".format(self.unit_type, self.name, self.source_file.filename)
+        out = "FortranModule({}, '{}', source_file='{}')"
+        return out.format(self.unit_type, self.name, self.parent_file)
 
-    def get_uses(self, contents, macros=None):
+    def get_uses(self, contents):
         """
         Find all instances of USE statements
 
         Args
         ----
         contents : list
-            Contents of the source file
-        macros : dict
-            Any defined macros
+            Contents of the source code
 
         Returns
         -------
@@ -244,20 +239,14 @@ class FortranModule:
         """
         uses = []
 
-        # loop over module/program definition, but skip "end module/program ..." line
-        for line in contents[self._defined_at:self._end]:
+        for line in contents:
             found = re.match(USE_REGEX, line)
             if (found):
-                uses.append(found.group('moduse').strip()) # store the module name that is USEd
+                name = found.group('moduse').strip().lower() # store module name
+                uses.append(name)
 
         # remove duplicates
         uniq_mods = list(set(uses))
-
-        if (macros is not None):
-            for i, mod in enumerate(uniq_mods):
-                for k, v in macros.items():
-                    if (re.match(k, mod, re.IGNORECASE)): # if the definition is found in module name, replace it
-                        uniq_mods[i] = mod.replace(k,v)
 
         return uniq_mods
 

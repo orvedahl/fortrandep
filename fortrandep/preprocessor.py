@@ -36,8 +36,8 @@ class FortranPreprocessor:
                 raise ValueError("macros should be dictionary or list")
 
         self.search_paths = [] # collection of search paths
-        if (search_paths not is None):
-            self.add_paths(seach_paths)
+        if (search_paths is not None):
+            self.add_paths(search_paths)
 
     def define(self, definition):
         """
@@ -48,10 +48,10 @@ class FortranPreprocessor:
         """
         if ("=" in definition):
             temp = definition.split("=")
-            name = temp[0]
-            value = temp[1]
+            name = temp[0].strip()
+            value = temp[1].strip()
         else:
-            name = definition
+            name = definition.strip()
             value = True
         self.macros[name] = value
 
@@ -75,6 +75,9 @@ class FortranPreprocessor:
             search path to include
         """
         self.search_paths.append(os.path.abspath(path))
+
+        # ensure there are no duplicates
+        self.search_paths = list(set(self.search_paths))
 
     def parse(self, text):
         """
@@ -247,7 +250,8 @@ class FortranPreprocessor:
                 exists = [os.path.isfile(f) for f in filenames]
 
                 if (not any(exists)):
-                    raise ValueError("ERROR: path does not contain #include file = {}".format(name))
+                    e = "ERROR: path does not contain #include file = {}".format(name)
+                    raise ValueError(e)
 
                 # find first instance of included file that is in the path
                 filename = filenames[exists.index(True)]

@@ -4,7 +4,7 @@ Basic preprocessor tools for Fortran files
 from __future__ import print_function
 import os
 import sys
-from .units import FortranFile, FortranModule
+from .core import FortranFile, FortranModule
 
 # default modules to ignore
 default_ignored_modules = ['iso_c_binding', 'iso_fortran_env']
@@ -23,8 +23,9 @@ class FortranProject:
     files : dict
         Collection of FortranFile objects for each source file that will be included
     """
-    def __init__(self, name=None, exclude_files=None, files=None, search_dirs=None,
-                 extensions=None, ignore_modules=None,
+    def __init__(self, name=None, files=None, exclude_files=None,
+                 ignore_modules=None,
+                 search_dirs=None, extensions=None,
                  macros=None, pp_search_path=None, use_preprocessor=True,
                  verbose=False):
         """
@@ -32,20 +33,20 @@ class FortranProject:
         ----
         name : str
             Name of the Fortran project, defaults to current working directory
-        exclude_files : list
-            List of files to exclude
         files : list
             List of source files to include
+        exclude_files : list
+            List of files to exclude
+        ignore_modules : list
+            List of module names to ignore, default includes iso_c_binding and iso_fortran_env
         search_dirs : list
             Collection of directories to search for source files. Only used if files=None.
         extensions : list
             List of file extensions to search for. Only used if files=None
-        ignore_modules : list
-            List of module names to ignore, default includes iso_c_binding and iso_fortran_env
-        macros : dict
-            The keys are the definition name, values are the definition value
-        search_paths : list
-            List of search paths to look for included files
+        macros : list
+            Collection of macro definitions
+        pp_search_paths : list
+            List of preprocessor search paths to look for included files
         use_preprocessor : bool
             Run the reprocessor on the files
         verbose : bool
@@ -59,25 +60,30 @@ class FortranProject:
         if (files is None):
             files = self.get_source(search_dirs, extensions)
         elif (not isinstance(files, list)):
-            files = [os.path.abspath(files)]
+            files = [os.path.relpath(files)]
         else:
-            files = [os.path.abspath(f) for f in files]
+            files = [os.path.relpath(f) for f in files]
 
         if (exclude_files is not None):
             if (not isinstance(exclude_files, list)):
-                exclude_files = [os.path.abspath(exclude_files)]
+                exclude_files = [os.path.relpath(exclude_files)]
             else:
-                exclude_files = [os.path.abspath(f) for f in exclude_file]
-            files = set(files) - set(exclude_files) # make files unique and remove exclude files
+                exclude_files = [os.path.relpath(f) for f in exclude_file]
+        else:
+            exclude_files = []
+
+        # remove duplicates and excluded files
+        files = list(set(files) - set(exclude_files))
 
         # build FortranFile objects
-        self.files = {filename : FortranFile(filename=filename, macros=macros, readfile=True,
-                                             pp_search_path=pp_search_path,
-                                             use_preprocessor=use_preprocessor)
-                      for filename in files}
+        self.files = {fname : FortranFile(filename=fname, readfile=True, macros=macros,
+                                          pp_search_path=pp_search_path,
+                                          use_preprocessor=use_preprocessor)
+                      for fname in files}
 
-        # find modules and programs
-        self.modules = self.get_modules()
+        self.modules = self.get_modules() # collect all modules for the project
+
+        # tease out the programs that were found
         self.programs = {k: v for k,v in self.modules.items() if v.unit_type == "program"}
 
         # remove ignored modules
@@ -117,7 +123,7 @@ class FortranProject:
         for d in search_dirs: # seach given directories and find files with given extension
             tmp = os.listdir(d)
             for ext in extensions:
-                files.extend([os.path.abspath(x) for x in tmp if x.endswith(ext)])
+                files.extend([os.path.relpath(x) for x in tmp if x.endswith(ext)])
 
         return files
 
@@ -131,8 +137,8 @@ class FortranProject:
             A collection of FortranModule objects
         """
         modules = {}
-        for source_file in self.files.values(): # loop of FortranFile objects
-            modules.update(source_file.modules)
+        for source_file in self.files.values(): # loop over FortranFile objects
+            modules.update(source_file.modules) # add modules in this file to the project
         return modules
 
     def remove_ignored_modules(self, ignore_modules=None):
@@ -150,16 +156,22 @@ class FortranProject:
             ignore_modules = [ignore_modules]
 
         # include the default modules that are ignored
-        ignore_modules = ignore_modules + default_ignored_modules
+        ignore_modules = list(set(ignore_modules + default_ignored_modules))
 
+        # references to a particular module are in three places:
+        #   1) list of all modules in the project
+        #   2) other modules may 'use' the ignored module
+        #   3) files may 'use' the ignored module
         for ignore_mod in ignored_modules:
-            self.modules.pop(ignore_mod, None)
-            for module in self.modules.values(): # remove from 'used' modules
+            m = self.modules.pop(ignore_mod, None) # 1) remove from project modules
+
+            for module in self.modules.values(): # 2) loop over all remaining modules
                 try:
                     module.uses.remove(ignore_mod)
                 except ValueError:
                     pass
-            for source_file in self.files.values(): # remove from 'used' files
+
+            for source_file in self.files.values(): # 3) loop over all File objects
                 try:
                     source_file.uses.remove(ignore_mod)
                 except ValueError:
@@ -180,25 +192,25 @@ class FortranProject:
             Collection of FortranModule objects that each module depends on
         """
         depends = {}
-        for module in self.modules.values(): # loop over FortranModule objects
+        for module in self.modules.values(): # loop over all modules in project
             graph = []
             for used_mod in module.uses: # loop over all USEd modules
                 try:
                     graph.append(self.modules[used_mod])
                 except KeyError:
-                    new_module = FortranModule(unit_type='module', name=used_mod)
-                    graph.append(new_module)
-                    err = "ERROR: module \"{}\" not defined in any files, using empty FortranModule"
+                    #new_module = FortranModule(unit_type='module', name=used_mod)
+                    #graph.append(new_module)
+                    err = "ERROR: module \"{}\" not defined in any files, skipping"
                     print(err.format(used_mod))
 
             # sort dependencies based on source filename
-            depends[module] = sorted(graph, key=lambda f: f.source_file.filename)
+            depends[module.name] = sorted(graph, key=lambda f: f.source_file.filename)
 
         if (verbose):
-            for m in sorted(depends.keys(), key=lambda f: f.source_file.filename):
-                print("Module {} depends on:".format(m.name))
+            for m in sorted(depends.keys(), key=lambda f: depends[f].source_file.filename):
+                print("Module {} depends on:".format(m))
                 for dep in depends[m]:
-                    print("\t{}".format(dep.name))
+                    print("\t{}".format(dep))
 
         return depends
 
@@ -222,17 +234,17 @@ class FortranProject:
             for mod in source_file.uses: # loop over all USEd modules
                 try:
                     mod_file = self.modules[mod].source_file
-                    if (mod_file.filename.lower() == source_file.filename.lower()): continue # skip self
+                    if (mod_file.filename.lower() == source_file.filename.lower()): continue
                     graph.append(mod_file)
                 except KeyError:
                     err = "ERROR: module \"{}\" not defined in any files, skipping..."
                     print(err.format(mod))
 
             # sort dependencies based on source filename
-            depends[source_file] = sorted(graph, key=lambda f: f.filename)
+            depends[source_file.filename] = sorted(graph, key=lambda f: f.filename)
 
         if (verbose):
-            for f in sorted(depends.keys(), key=lambda f: f.filename):
+            for f in sorted(depends.keys(), key=lambda f: depends[f].filename):
                 print("File {} depends on:".format(f))
                 for dep in depends[f]:
                     print("\t{}".format(dep.filename))
@@ -259,6 +271,8 @@ class FortranProject:
 
         # helper function to format dependency line
         def _format_dependencies(target, target_ext, dep_list):
+            # target_ext : the target extension usually ".o"
+            # dep_list : list of dependencies for this target
             _, filename = os.path.split(target)
             target_name = os.path.splitext(filename)[0] + target_ext
             listing = "\n{} : ".format(os.path.join(build, target_name))
@@ -270,17 +284,17 @@ class FortranProject:
             return listing
 
         if (os.path.isfile(output) and (not overwrite)): # file exists and overwrite=False
-            print("ERROR: file = {} already exists and overwrite=False, exiting.".format(output))
+            err = "ERROR: file = {} already exists and overwrite=False, exiting."
+            print(err.format(output))
             return
 
         with open(output, 'w') as mf:
             mf.write(HEADER)
 
-            if (not skip_programs): # write out dependencies for programs
-                for program in self.programs.keys():
-                    program_deps = self.get_all_used_files(program)
-                    listing = _format_dependencies(program, "", program_deps)
-                    mf.write(listing)
+            for program in self.programs.keys(): # write out dependencies for programs
+                program_deps = self.get_all_used_files(program)
+                listing = _format_dependencies(program, "", program_deps)
+                mf.write(listing)
 
             for f in sorted(self.depends_by_file.keys(), key=lambda f: f.filename):
                 dep_list = [dep.filename for dep in self.depends_by_file[f]]
@@ -302,11 +316,14 @@ class FortranProject:
             List of filenames
         """
         used_modules = self._get_all_used_modules(module_name, state=[])
+
+        # grab list of filenames
         used_files = [self.modules[module].source_file.filename for module in used_modules]
 
+        # add the modules own file
         module_filename = self.modules[module_name].source_file.filename
 
-        return sorted(set(used_files + [module_filename]))
+        return sorted(list(set(used_files + [module_filename])))
 
     def get_all_used_modules(self, module_name):
         """
@@ -333,7 +350,7 @@ class FortranProject:
         module_name : str
             The module/program name
         state : list
-            A list of modules to ignore
+            A list of modules that have already been processed by this routine
 
         Returns
         -------
@@ -342,12 +359,12 @@ class FortranProject:
         """
         for module in self.modules[module_name].uses:
             try:
-                if (module in state): continue # ignore these modules
+                if (module in state): continue # ignore these modules, already processed
                 state.append(module)
-                if (self.modules[module].uses):
+                if (len(self.modules[module].uses) != 0):
                     state.extend(self._get_all_used_modules(module, state)) # somewhat recursive
             except KeyError:
                 print("ERROR: module {} not defined in any files, skipping...".format(module))
 
-        return sorted(set(state))
+        return sorted(list(set(state)))
 
