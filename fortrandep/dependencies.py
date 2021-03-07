@@ -4,6 +4,7 @@ Basic preprocessor tools for Fortran files
 from __future__ import print_function
 import os
 import sys
+from collections import OrderedDict
 from .core import FortranFile, FortranModule
 
 # default modules to ignore
@@ -28,6 +29,7 @@ class FortranProject:
     def __init__(self, name=None, files=None, exclude_files=None,
                  ignore_modules=None,
                  search_dirs=None, extensions=None,
+                 exec_names=None,
                  macros=None, pp_search_path=None, use_preprocessor=True,
                  verbose=False):
         """
@@ -45,6 +47,8 @@ class FortranProject:
             Collection of directories to search for source files. Only used if files=None.
         extensions : list
             List of file extensions to search for. Only used if files=None
+        exec_names : dict
+            Give a mapping of program name to corresponding executable name
         macros : list
             Collection of macro definitions
         pp_search_paths : list
@@ -89,6 +93,20 @@ class FortranProject:
 
         # tease out the programs that were found
         self.programs = {k: v for k,v in self.modules.items() if v.unit_type == "program"}
+
+        if (exec_names is None):
+            self.exec_names = {k:"x"+k for k,v in self.programs.items()}
+        else:
+            if (len(exec_names.keys()) != len(self.programs.keys())):
+                print("\nERROR: number of executable names differs from found programs")
+                print("\nPrograms found = {}".format(len(self.programs.keys())))
+                for k in self.programs.keys():
+                    print("\t{}".format(k))
+                print("\nExecutable names found = {}".format(len(exec_names.keys())))
+                for k in exec_names.keys():
+                    print("\t{}".format(k))
+                raise ValueError
+            self.exec_names = exec_names
 
         # remove ignored modules
         self.remove_ignored_modules(ignore_modules)
@@ -209,14 +227,18 @@ class FortranProject:
             # sort dependencies based on source filename
             depends[module.name] = sorted(graph, key=lambda f: f.source_file.filename)
 
+        # sort in a sensible way: based on number of USEd modules
+        sdepends = OrderedDict()
+        for key in sorted(depends, key=lambda name : len(depends[name])):
+            sdepends[key] = depends[key]
+
         if (verbose):
-            keys = depends.keys()
-            for m in keys: #sorted(depends.keys(), key=lambda f: depends[f].source_file.filename):
+            for m in sdepends.keys():
                 print("Module {} depends on:".format(m))
-                for dep in depends[m]:
+                for dep in sdepends[m]:
                     print("\t{}".format(dep))
 
-        return depends
+        return sdepends
 
     def get_depends_by_file(self, verbose):
         """
@@ -248,16 +270,67 @@ class FortranProject:
             # sort dependencies based on source filename
             depends[source_file.filename] = sorted(graph, key=lambda f: f.filename)
 
+        # sort in a sensible way: based on number of USEd modules
+        sdepends = OrderedDict()
+        for key in sorted(depends, key=lambda fname : len(depends[fname])):
+            sdepends[key] = depends[key]
+
         if (verbose):
-            keys = depends.keys()
-            for f in keys: #sorted(depends.keys(), key=lambda f: depends[f].filename):
+            for f in sdepends.keys():
                 print("File {} depends on:".format(f))
-                for dep in depends[f]:
+                for dep in sdepends[f]:
                     print("\t{}".format(dep.filename))
 
-        return depends
+        return sdepends
 
-    def write_dependencies(self, output, overwrite=False, build=None):
+    def _format_dependencies(self, target, target_ext, dep_list, build=None, program=False):
+        """
+        Write out the makefile line "target : dependencies"
+
+        Args
+        ----
+        target : str
+            The main target for this rule
+        target_ext : str
+            The extension of the target including the ".", usually ".o"
+        dep_list : list
+            The list of file dependencies
+        build : str, optional
+            The object files are located in this directory
+        program : bool, optional
+            This rule is for a "program" not a "module"
+
+        Returns
+        -------
+        listing : str
+            The formatted makefile rule, ready to write to the file
+        """
+        name = os.path.splitext(target)[0] + target_ext # full path, change ext
+
+        # remove duplicate depenencies: use two modules defined in same file
+        udep_list = []
+        for x in dep_list:
+            if (x not in udep_list):
+                udep_list.append(x)
+
+        if (build is not None):
+            # modify the path where dependencies live
+            udep_list = [os.path.join(build, os.path.split(x)[1]) for x in udep_list]
+
+        # make each dependency an object file extension
+        dep_list = [os.path.splitext(i)[0] + target_ext for i in udep_list]
+
+        # build rule using full path of target and dependency list
+        # also include original path of file name
+        listing = "{} : ".format(name) + " ".join(dep_list)
+        if (program):
+            listing += "\n"
+        else:
+            listing += " {}\n".format(target)
+
+        return listing
+
+    def write_dependencies(self, output, overwrite=False, build=None, skip_programs=True):
         """
         Write dependencies to file
 
@@ -268,24 +341,10 @@ class FortranProject:
         overwrite : bool
             Overwrite existing dependency file
         build : str
-            Directory to prepend to filenames
+            Directory where the object files are located
+        skip_programs : bool
+            Do not process the program rules, only dependencies of modules
         """
-        if (build is None):
-            build = ''
-
-        # helper function to format dependency line
-        def _format_dependencies(target, target_ext, dep_list):
-            # target_ext : the target extension usually ".o"
-            # dep_list : list of dependencies for this target
-            _, filename = os.path.split(target)
-            target_name = os.path.splitext(filename)[0] + target_ext
-            listing = "\n{} : ".format(os.path.join(build, target_name))
-            for dep in dep_list:
-                _, depfilename = os.path.split(dep)
-                depobjectname = os.path.splitext(depfilename)[0] + target_ext
-                listing += " {}".format(os.path.join(build, depobjectname))
-            listing += "\n"
-            return listing
 
         if (os.path.isfile(output) and (not overwrite)): # file exists and overwrite=False
             err = "ERROR: file = {} already exists and overwrite=False, exiting."
@@ -296,20 +355,26 @@ class FortranProject:
         with open(output, 'w') as mf:
             mf.write(HEADER)
 
-            for program in self.programs.keys(): # write out dependencies for programs
-                program_deps = self.get_all_used_files(program)
-                listing = _format_dependencies(program, "", program_deps)
+            keys = self.depends_by_file.keys()
+            for f in keys:
+                dep_list = [dep.filename for dep in self.depends_by_file[f]] # get filenames
+                listing = self._format_dependencies(f, ".o", dep_list, build=build)
                 mf.write(listing)
 
-            keys = self.depends_by_file.keys()
-            for f in keys: #sorted(self.depends_by_file.keys(), key=lambda f: f.filename):
-                dep_list = [dep.filename for dep in self.depends_by_file[f]]
-                listing = _format_dependencies(f, ".o", dep_list)
-                mf.write(listing)
+            if (not skip_programs):
+                for program in self.programs.keys(): # write out dependencies for programs
+                    program_deps = self.get_all_used_files(program)
+                    exec_name = self.exec_names[program]
+                    listing = self._format_dependencies(exec_name, "", dep_list, program=True)
+                    mf.write(listing)
 
     def get_all_used_files(self, module_name):
         """
         Find complete set of files that a module requires, either directly or indirectly
+
+        Does not include the file that defines this module, so maybe function name is
+        wrong. The file that owns this module is included when the dependency list
+        is written to the makefile dependency file.
 
         Args
         ----
@@ -327,9 +392,12 @@ class FortranProject:
         used_files = [self.modules[module].source_file.filename for module in used_modules]
 
         # add the modules own file
-        module_filename = self.modules[module_name].source_file.filename
+        #module_filename = self.modules[module_name].source_file.filename
 
-        return sorted(list(set(used_files + [module_filename])))
+        #x = list(set(used_files + [module_filename]))
+        x = list(set(used_files))
+
+        return x
 
     def get_all_used_modules(self, module_name):
         """
@@ -345,7 +413,11 @@ class FortranProject:
         files : list
             List of module names
         """
-        return self._get_all_used_modules(module_name, state=[])
+        x = self._get_all_used_modules(module_name, state=[])
+
+        x = list(set(x))
+
+        return x
 
     def _get_all_used_modules(self, module_name, state):
         """
