@@ -67,14 +67,14 @@ class FortranFile:
         if (filename is not None): # only error trap filenames that were provided
             if (not os.path.isfile(filename)):
                 e = "File does not exist or is not a file: {}".format(filename)
-                raise FileNotFoundError(e)
+                raise ValueError(e)
         else:
             # filename was specified as None, do not process it
             readfile = False
 
         self.filename = filename
-        self.uses = None     # will be a list of modules USEd by this file
-        self.modules = None  # will be a dict of FortranModule objects
+        self.uses = []     # list of modules USEd by this file
+        self.modules = {}  # dict of FortranModule objects
 
         if (readfile):
             with open(self.filename, 'r') as f: # read file contents into list
@@ -88,7 +88,7 @@ class FortranFile:
                     if (line.lstrip().startswith("#")): # track if any macros are used
                         has_directives = True
 
-                    contents.append(f.readline())
+                    contents.append(line)
 
             # only preprocess if asked to & there are directives to parse
             if (has_directives and use_preprocessor):
@@ -161,16 +161,13 @@ class FortranFile:
         uses : list
             A collection of module names
         """
-        if (self.modules is None):
-            uses = []
-        else:
-            uses = []
-            for mod in self.modules.keys():
-                module = self.modules[mod]
-                for m in module.uses:
-                    uses.append(m)
+        uses = []
+        for mod in self.modules.keys():
+            module = self.modules[mod]
+            for m in module.uses:
+                uses.append(m)
 
-            uses = list(set(uses)).sort() # sort results and make it unique
+        list(set(uses)).sort() # sort results in place and make it unique
 
         return uses
 
