@@ -218,7 +218,7 @@ class FortranPreprocessor:
         # select the proper block of code
         if (((if_type == "def") and is_defined) or ((if_type == "ndef") and (not is_defined))):
             return first_block
-        else
+        else:
             return second_block
 
     def _parse_include_directives(self, text):
