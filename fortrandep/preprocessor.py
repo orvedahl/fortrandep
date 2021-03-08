@@ -28,7 +28,8 @@ class FortranPreprocessor:
         self.macros = {} # keep track of macro definitions
         if (macros is not None):
             if (isinstance(macros, dict)):
-                self.macros.update(macros)
+                for k,v in macros.items():
+                    self.define("{}={}".format(k,v))
             elif (isinstance(macros, list)): # assume list
                 for m in macros:
                     self.define(m)

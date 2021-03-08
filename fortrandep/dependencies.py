@@ -26,17 +26,15 @@ class FortranProject:
     success : bool
         The exit status of parsing the files
     """
-    def __init__(self, name=None, files=None, exclude_files=None,
+    def __init__(self, files=None, exclude_files=None,
                  ignore_modules=None,
                  search_dirs=None, extensions=None,
                  exec_names=None,
                  macros=None, pp_search_path=None, use_preprocessor=True,
-                 verbose=False):
+                 name=None, verbose=False):
         """
         Args
         ----
-        name : str
-            Name of the Fortran project, defaults to current working directory
         files : list
             List of source files to include
         exclude_files : list
@@ -55,6 +53,8 @@ class FortranProject:
             List of preprocessor search paths to look for included files
         use_preprocessor : bool
             Run the reprocessor on the files
+        name : str
+            Name of the Fortran project, defaults to current working directory
         verbose : bool
             Print more messages
         """
@@ -351,7 +351,7 @@ class FortranProject:
 
         return listing
 
-    def write_dependencies(self, output, overwrite=False, build=None, skip_programs=False):
+    def write(self, output, overwrite=False, build=None, skip_programs=False):
         """
         Write dependencies to file
 

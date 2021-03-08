@@ -14,8 +14,9 @@
 #
 #     2) choose if using the probin and/or info modules (build_probin, build_info)
 #            these choices have implications for dependencies and what is built
+#            the default behavior is to not use either one
 #
-#     3) specify any modules that the dependency checker should skip
+#     3) specify any modules that the dependency checker should skip, default is none
 #
 #     4) choose compiler, flags, include dirs, library dirs, etc.
 #
@@ -23,11 +24,8 @@
 #
 #     6) include the main makefile machinery
 #
-# A minimal working example for a Makefile would include:
+# A minimal working example for a Makefile would include 4 lines:
 #     src_dirs := <list of directories>
-#     build_probin :=
-#     build_info :=
-#     skip_modules :=
 #     f90_comp := gfortran
 #     MAKEFILE_HOME_DIR := /path/to/FortranDep/Makefiles
 #     include $(MAKEFILE_HOME_DIR)/GMain.mak
@@ -47,12 +45,12 @@ src_dirs := REQUIRED
 # determine whether to use the crude input parameter namelist option.
 # this is awesome for quick/dirty projects, but not refined enough for
 # complex ones
-build_probin := REQUIRED
+build_probin :=
 namelist_name := input
 
 # determine whether to use the crude build-info module to include compiler
 # information in the Fortran code through a module
-build_info := REQUIRED
+build_info :=
 
 # executable basename, will be modified unless "do_not_modify_exe_name := t"
 # an example modification would be: xmain.Linux.gfortran.debug.exe
@@ -73,7 +71,7 @@ do_not_modify_exe_name :=
 # named "omp" or a file containing module named "mpi" but it will search 
 # for a file containing module "my_freq". This allows "system" modules
 # to still be used.
-skip_modules := REQUIRED
+skip_modules :=
 
 ##########################################################################
 # how to build
@@ -113,6 +111,16 @@ include_flags :=
 
 # set library flags here, e.g., -L<some dir> -llib1 -llib2 libmylib.so
 library_flags :=
+
+#-------------------------------------------------------------------------
+# Preprocessor Settings
+#-------------------------------------------------------------------------
+# space separated list of places where the preprocessor can find "#include" files
+pp_search_paths :=
+
+# space separated list of user defined preprocessor macros
+# each macro should be name=value, with no spaces
+pp_macros :=
 
 ##########################################################################
 # include the rest of the Makefile

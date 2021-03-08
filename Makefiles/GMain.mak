@@ -199,17 +199,27 @@ vpath %.f90 . $(vpath_loc)
 #    The magic happens with the '$^' character. This holds all 
 #    the dependencies with their full directory path
 #----------------------------------------------------------------
-$(dep_file): $(sort $(f90sources))
+$(dep_file):
 	@if [ ! -d $(tdir) ]; then mkdir -p $(tdir); fi
 ifdef verbose
 	@echo ""
 	@echo "${bold}Writing f90 dependency File ...${normal}"
-	$(dep_script) --no-msgs --output=$(dep_file) \
-		--skip-mods="$(skip_modules)" --prefix=$(odir)/ $^
+	$(dep_script) --output=$(dep_file) --preprocess \
+		--exclude="$(sf90sources)" \
+		--ignore-mods="$(skip_modules)" \
+		--macros="$(pp_macros)" \
+		--search-paths="$(pp_search_paths)" \
+		--build=$(odir)/ \
+		$^
 	@echo ""
 else
-	$(dep_script) --no-msgs --output=$(dep_file) \
-		--skip-mods="$(skip_modules)" --prefix=$(odir)/ $^
+	$(dep_script) --output=$(dep_file) --preprocess \
+		--exclude="$(sf90sources)" \
+		--ignore-mods="$(skip_modules)" \
+		--macros="$(pp_macros)" \
+		--search-paths="$(pp_search_paths)" \
+		--build=$(odir)/ \
+		$^
 endif
 
 # include the dependencies file (which says what depends on what)

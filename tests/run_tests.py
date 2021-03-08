@@ -166,7 +166,7 @@ def main():
                            pp_search_path=search_paths, verbose=print_dependencies)
 
         build = tests[tdir].pop("build", None)
-        P.write_dependencies(os.path.join(tdir, "depends.mak"), overwrite=True, build=build)
+        P.write(os.path.join(tdir, "depends.mak"), overwrite=True, build=build)
 
         if (P.success):
             print("\t",end=''); print_color("Pass", "green")
