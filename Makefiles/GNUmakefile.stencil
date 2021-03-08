@@ -1,0 +1,125 @@
+#
+# General Makefile
+#
+# Required elements:
+#     1a) specify src_dirs: list of directories where source code can be found
+#
+#     1b) each directory should have a file called "GPackage.mak" that
+#         defines the source files to include. It is formatted as follows:
+#               f90sources += filename1.f90
+#               f90sources += filename2.f90
+#               sf90sources += filename3.f90
+#         with one entry per line and the path to the file is not required.
+#         entries that use "sf90sources" will not go through the dependency checker.
+#
+#     2) choose if using the probin and/or info modules (build_probin, build_info)
+#            these choices have implications for dependencies and what is built
+#
+#     3) specify any modules that the dependency checker should skip
+#
+#     4) choose compiler, flags, include dirs, library dirs, etc.
+#
+#     5) set MAKEFILE_HOME_DIR at the bottom
+#
+#     6) include the main makefile machinery
+#
+# A minimal working example for a Makefile would include:
+#     src_dirs := <list of directories>
+#     build_probin :=
+#     build_info :=
+#     skip_modules :=
+#     f90_comp := gfortran
+#     MAKEFILE_HOME_DIR := /path/to/FortranDep/Makefiles
+#     include $(MAKEFILE_HOME_DIR)/GMain.mak
+#
+# Below are all the user-available options and a short description. Any entry
+# whose value is listed as REQUIRED needs to be changed by the user. All
+# other variables are shown with their default value.
+#
+
+##########################################################################
+# what to build
+##########################################################################
+
+# list of directories that holds source files
+src_dirs := REQUIRED
+
+# determine whether to use the crude input parameter namelist option.
+# this is awesome for quick/dirty projects, but not refined enough for
+# complex ones
+build_probin := REQUIRED
+namelist_name := input
+
+# determine whether to use the crude build-info module to include compiler
+# information in the Fortran code through a module
+build_info := REQUIRED
+
+# executable basename, will be modified unless "do_not_modify_exe_name := t"
+# an example modification would be: xmain.Linux.gfortran.debug.exe
+exe_base := main
+do_not_modify_exe_name :=
+
+##########################################################################
+# dependencies
+##########################################################################
+# list of modules to skip when running through the automated dependency
+# generator. if a file contains:
+#       use omp
+#       use mpi
+#       use my_freq
+# and the skip-modules variable is set to:
+#       skip_modules := omp mpi
+# then the generator will not search for a file that contains a module 
+# named "omp" or a file containing module named "mpi" but it will search 
+# for a file containing module "my_freq". This allows "system" modules
+# to still be used.
+skip_modules := REQUIRED
+
+##########################################################################
+# how to build
+##########################################################################
+# print more information to the screen during compile/link
+verbose := t
+
+# run in debug mode, usually coupled to which flags to use
+debug :=
+
+#-------------------------------------------------------------------------
+# Compiler Settings
+#-------------------------------------------------------------------------
+# Fortran compiler (choices are "gfortran" or "intel" so far)
+f90_comp := REQUIRED
+
+# specify where to put the compiled files
+build_dir := _build
+
+# set compiler flags manually or leave blank to use defaults
+# if manually setting, a useful block to include will be
+#     ifdef debug
+#       f90_flags := <set debug flags here>
+#     else
+#       f90_flags := <set optimized flags here>
+#     endif
+f90_flags :=
+
+# include the OpenMP compiler flag, only used if f90_flags is not set
+OMP :=
+
+# include extra flags (these will always be added on)
+xtr_f90_flags :=
+
+# set include directories, e.g., -I<some dir>
+include_flags :=
+
+# set library flags here, e.g., -L<some dir> -llib1 -llib2 libmylib.so
+library_flags :=
+
+##########################################################################
+# include the rest of the Makefile
+##########################################################################
+# this variable must be defined and point to the top Makefile directory
+MAKEFILE_HOME_DIR := REQUIRED
+
+# REQUIRED: this line needs no modification, but must be included
+include $(MAKEFILE_HOME_DIR)/GMain.mak
+

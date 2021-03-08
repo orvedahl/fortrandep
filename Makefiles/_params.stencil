@@ -1,0 +1,19 @@
+# This file contains the runtime parameters. It is parsed by 
+# write_io_module.py and uses input_params_template to write 
+# probin.f90 at compile time
+#
+
+#--------------------------------------------------------------
+# time 
+#--------------------------------------------------------------
+tstop                      real             1.d0
+
+# boundary type
+xlboundary                 character        "periodic"
+
+# do conservative update
+cons_update                logical          .true.
+
+# max iterations
+max_iter                   integer          1000
+
