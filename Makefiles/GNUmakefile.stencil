@@ -82,6 +82,9 @@ verbose := t
 # run in debug mode, usually coupled to which flags to use
 debug :=
 
+# what command will run a python script, e.g., python, python3, python2, etc.
+python_exe := python
+
 #-------------------------------------------------------------------------
 # Compiler Settings
 #-------------------------------------------------------------------------

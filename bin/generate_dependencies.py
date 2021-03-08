@@ -36,7 +36,8 @@ from fortrandep import FortranProject
 
 def parse_input(entry):
     """parse the input string of space/comma separated strings"""
-    if (entry is None): return entry
+    if (entry is None or entry.strip() == ""):
+        return None
 
     if ("," in entry):
         fields = entry.split(",")
@@ -49,7 +50,7 @@ def parse_input(entry):
 def main(files, preprocess, exclude, ignore, macros, search_paths, output, build):
 
     # parse incoming entries: exclude, ignore, macros, search_paths
-    search_paths = parse_input(searchp_paths)
+    search_paths = parse_input(search_paths)
     exclude      = parse_input(exclude)
     ignore       = parse_input(ignore)
     macros       = parse_input(macros)

@@ -2,8 +2,13 @@
 # Main makefile build Information
 #
 
+#----------------------------------------------------------------
+# various locations
+#----------------------------------------------------------------
+dep_script_dir := $(MAKEFILE_HOME_DIR)/../bin/
 scripts_dir := $(MAKEFILE_HOME_DIR)/scripts
-compiler_directory := $(MAKEFILE_HOME_DIR)/compilers
+compiler_dir := $(MAKEFILE_HOME_DIR)/compilers
+template_dir := $(MAKEFILE_HOME_DIR)/_templates/
 
 #----------------------------------------------------------------
 # remove command
@@ -34,11 +39,11 @@ hostnamef := $(shell hostname -f)
 # include some basic compiler info
 #----------------------------------------------------------------
 ifeq ($(findstring gfortran, $(f90_comp)),gfortran)
-  include $(compiler_directory)/gfortran.mak
+  include $(compiler_dir)/gfortran.mak
   comp_suf := .gfortran
 else
   ifeq ($(f90_comp), intel)
-    include $(compiler_directory)/intel.mak
+    include $(compiler_dir)/intel.mak
     comp_suf := .intel
   else
     $(error "Compiler $(f90_comp) is not supported")
@@ -89,7 +94,11 @@ vpath_loc :=
 #----------------------------------------------------------------
 # python dependency checker info
 #----------------------------------------------------------------
-dep_script := $(MAKEFILE_HOME_DIR)/../fortrandep/dependencies.f90
+ifndef python_exe
+  python_exe := python
+endif
+
+dep_script := $(dep_script_dir)/generate_dependencies.py
 
 # output file
 dep_file := $(tdir)/fortran.depends
@@ -103,7 +112,7 @@ all: $(dep_file) $(exe)
 # runtime parameter stuff (probin.f90)
 #----------------------------------------------------------------
 ifdef build_probin
-probin_template := $(MAKEFILE_HOME_DIR)/_templates/input_params_template
+probin_template := $(template_dir)/input_params_template
 
 ifndef namelist_name
   namelist_name := input
@@ -113,17 +122,17 @@ endif
 probin_dirs = . $(src_dirs)
 
 # get list of all valid _params files
-params_files := $(shell $(scripts_dir)/find_paramfiles.py $(probin_dirs))
+params_files := $(shell $(python_exe) $(scripts_dir)/find_paramfiles.py $(probin_dirs))
 
-probin.f90:
+probin.f90: $(params_files) $(probin_template) $(namelist_name)
 ifdef verbose
 	@echo ""
 	@echo "${bold}Writing probin.f90 ...${normal}"
-	$(scripts_dir)/write_input_params.py -t "$(probin_template)" \
+	$(python_exe) $(scripts_dir)/write_input_params.py -t "$(probin_template)" \
              -o probin.f90 -n $(namelist_name) -p "$(params_files)"
 	@echo ""
 else
-	$(scripts_dir)/write_input_params.py -t "$(probin_template)" \
+	$(python_exe) $(scripts_dir)/write_input_params.py -t "$(probin_template)" \
              -o probin.f90 -n $(namelist_name) -p "$(params_files)"
 endif
 
@@ -137,13 +146,11 @@ endif
 # build info stuff (build_info.f90)
 #----------------------------------------------------------------
 ifdef build_info
-#$(dep_file): build_info.f90
-
 build_info.f90:
 ifdef verbose
 	@echo ""
 	@echo "${bold}Writing build_info.f90 ...${normal}"
-	$(scripts_dir)/makebuildinfo.py \
+	$(python_exe) $(scripts_dir)/makebuildinfo.py \
            --FCOMP "$(f90_comp)" \
            --FCOMP_version "$(f90_comp_vers)" \
            --f90_compile_line "$(f90_comp) $(f90_compile) -c" \
@@ -151,7 +158,7 @@ ifdef verbose
            --source_home "$(src_dirs)"
 	@echo ""
 else
-	$(scripts_dir)/makebuildinfo.py \
+	$(python_exe) $(scripts_dir)/makebuildinfo.py \
            --FCOMP "$(f90_comp)" \
            --FCOMP_version "$(f90_comp_vers)" \
            --f90_compile_line "$(f90_comp) $(f90_compile) -c" \
@@ -197,14 +204,15 @@ vpath %.f90 . $(vpath_loc)
 #----------------------------------------------------------------
 # rule to build the dependency file
 #    The magic happens with the '$^' character. This holds all 
-#    the dependencies with their full directory path
+#    the dependencies with their full directory path and gets
+#    passed to the script as a space separated list of files
 #----------------------------------------------------------------
-$(dep_file):
+$(dep_file): $(f90sources)
 	@if [ ! -d $(tdir) ]; then mkdir -p $(tdir); fi
 ifdef verbose
 	@echo ""
 	@echo "${bold}Writing f90 dependency File ...${normal}"
-	$(dep_script) --output=$(dep_file) --preprocess \
+	$(python_exe) $(dep_script) --output=$(dep_file) --preprocess \
 		--exclude="$(sf90sources)" \
 		--ignore-mods="$(skip_modules)" \
 		--macros="$(pp_macros)" \
@@ -213,7 +221,7 @@ ifdef verbose
 		$^
 	@echo ""
 else
-	$(dep_script) --output=$(dep_file) --preprocess \
+	$(python_exe) $(dep_script) --output=$(dep_file) --preprocess \
 		--exclude="$(sf90sources)" \
 		--ignore-mods="$(skip_modules)" \
 		--macros="$(pp_macros)" \
@@ -275,7 +283,7 @@ clean::
 
 realclean:: clean
 	$(RM) -rf $(tname)
-	$(RM) -f $(.exe)
+	$(RM) -f $(exe)
 
 #----------------------------------------------------------------
 # debug aide
