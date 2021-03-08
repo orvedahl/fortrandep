@@ -11,8 +11,18 @@ preprocessor directive would look like this:
 
 #ifdef USE_HOOKS
     use my_hooks
+#else
+    use standard
 #endif
 
 If the USE_HOOKS directive is defined, then this has important implications
 for the Makefile dependencies. Else clauses are supported, but else-if
 statements are not.
+
+The test/ directory contains a bunch of source tree variations and the
+dependencies will be written to a file named <test dir>/depends.mak. This file
+should be manually inspected to ensure proper handling of the specific test case.
+There is no automated checking of the output, there are simply too many variations
+to code. The 'PASS' that the python tester prints out, refers to the successful
+completion/writing of the dependency file, not the accuracy of said file.
+

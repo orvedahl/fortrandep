@@ -52,7 +52,7 @@ class FortranPreprocessor:
             value = temp[1].strip()
         else:
             name = definition.strip()
-            value = True
+            value = 1
         self.macros[name] = value
 
     def add_paths(self, paths):

@@ -1,5 +1,48 @@
 """
 Run all the test problems
+
+To add a new test:
+
+    1) make a new directory and add it to the 'tests' dictionary, using the directory
+       name as the key. Be sure to include a "note" that describes the purpose of the
+       test. Additional testing parameters specific to this test can be included
+       here as well, but their extraction/inclusion in the main loop must be added.
+
+    2) in the new test directory, build your source tree and add any source code
+
+    3) make a file named "source_files.txt" formatted as:
+
+           source : <rel path to source file 1>
+           source : <rel path to source file 2>
+           source : <rel path to source file 3>
+             .
+             .
+             .
+           exclude : <rel path of file 1 to exclude>
+           exclude : <rel path of file 2 to exclude>
+             .
+             .
+             .
+           ignore : <module 1 name to ignore>
+           ignore : <module 2 name to ignore>
+             .
+             .
+             .
+           macro : <name> = <value>
+           macro : <name> = <value>
+           macro : <name> = <value>
+             .
+             .
+             .
+
+       the dots indicate "repeat as necessary", ordering of lines is unimportant.
+           source = an actual source file
+           exclude = a file to ignore
+           ignore = the name of a module to ignore (not the filename)
+           macro = define a preprocessor macro for use with #ifdef and #ifndef
+
+    4) run this test suite as "python run_tests.py"
+
 """
 from __future__ import print_function
 import os
@@ -57,25 +100,62 @@ def main():
 
     tests = OrderedDict() # key is directory, value is dictionary of test parameters
 
-    tests["test-1"] = {}
-    tests["test-2"] = {}
-    tests["test-3"] = {}
-    tests["test-4"] = {}
-    tests["test-5"] = {}
-    tests["test-6"] = {}
-    tests["test-7"] = {"build":"_build/debug/odir"}
-    tests["test-8"] = {"build":"build"}
-    tests["pp-test-9"] = {"build":"odir"}
-    tests["pp-test-10"] = {"build":"odir"}
-    tests["pp-test-11"] = {"build":"odir"}
-    tests["pp-test-12"] = {"build":"odir"}
-    tests["pp-test-13"] = {"build":"odir"}
+    tests["test-1"] = {"note":['single file project']}
+    tests["test-2"] = {"note":['single file project, with module']}
+    tests["test-3"] = {"note":['multifile project', 'single src/ location']}
+    tests["test-4"] = {"note":['multifile project', 'two src/ locations']}
+    tests["test-5"] = {"note":['multifile project', 'multiple src/ directories']}
+    tests["test-6"] = {"note":['multifile project', 'multiple src/, ignore module']}
+    #--
+    tests["test-7"] = {"build":"_build/debug/odir",
+                       "note":['multifile project', 'multiple src/', 'ignore mod',
+                               'build specified']}
+    tests["test-8"] = {"build":"build",
+                       "note":['multifile project', 'multiple src/', 'ignore mod',
+                               'build specified', 'include file']}
+    #--
+    tests["pp-test-9"] = {"build":"odir",
+                          "note":['multifile project', 'multiple src/', 'ignore mod',
+                                  'build specified', '#include file']}
+    #--
+    tests["pp-test-10"] = {"build":"odir",
+                           "note":['multifile project', 'multiple src/', 'ignore mod',
+                                   'build specified', '#ifdef & defined']}
+    tests["pp-test-11"] = {"build":"odir",
+                           "note":['multifile project', 'multiple src/', 'ignore mod',
+                                   'build specified', '#ifdef & undefined']}
+    #--
+    tests["pp-test-12"] = {"build":"odir",
+                           "note":['multifile project', 'multiple src/', 'ignore mod',
+                                   'build specified', '#ifdef-else & defined']}
+    tests["pp-test-13"] = {"build":"odir",
+                           "note":['multifile project', 'multiple src/', 'ignore mod',
+                                   'build specified', '#ifdef-else & undefined']}
+    #--
+    tests["pp-test-14"] = {"build":"odir",
+                           "note":['multifile project', 'multiple src/', 'ignore mod',
+                                   'build specified', '#ifndef-else & undefined']}
+    tests["pp-test-15"] = {"build":"odir",
+                           "note":['multifile project', 'multiple src/', 'ignore mod',
+                                   'build specified', '#ifndef-else & defined']}
+    #--
+    tests["test-16"] = {"build":"build",
+                       "note":['multifile project', 'multiple src/', 'ignore mod',
+                               'build specified', 'include file', 'exclude file']}
+
+    verbose = True
+    print_dependencies = False
 
     passed = 0
     n_tests = len(tests.keys())
     for tdir in tests.keys():
         print("Running: ", end='')
         print_color("{}".format(tdir), "bold")
+        if (verbose):
+            if ("note" in tests[tdir].keys()):
+                print("\tParameters:")
+                for x in tests[tdir]["note"]:
+                    print("\t\t{}".format(x))
 
         files, excludes, ignores, macros = parse_input(tdir)
 
@@ -83,7 +163,7 @@ def main():
 
         P = FortranProject(name=tdir, files=files, exclude_files=excludes,
                            ignore_modules=ignores, macros=macros,
-                           pp_search_path=search_paths, verbose=True)
+                           pp_search_path=search_paths, verbose=print_dependencies)
 
         build = tests[tdir].pop("build", None)
         P.write_dependencies(os.path.join(tdir, "depends.mak"), overwrite=True, build=build)
