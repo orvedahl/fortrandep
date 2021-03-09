@@ -234,9 +234,10 @@ endif
 # MAKECMDGOALS is an intrinsic GNUmakefile variable that holds what 
 # target was entered on the command line
 # Only include the depends file if we are not cleaning up
+# the "-include" operates identically to include, but suppresses errors
 ifneq ($(MAKECMDGOALS), realclean)
   ifneq ($(MAKECMDGOALS), clean)
-    include $(dep_file)
+    -include $(dep_file)
   endif
 endif
 
