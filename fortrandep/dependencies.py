@@ -343,11 +343,14 @@ class FortranProject:
         dep_list = [os.path.splitext(i)[0] + target_ext for i in udep_list]
 
         # build rule for target using dependency list
-        listing = "{} : ".format(name) + " ".join(dep_list)
+        listing = "# {}\n".format(name)
+        line = "{} : {}\n"
+        for dep in dep_list:
+            listing += line.format(name, dep)
         if (program):
             listing += "\n"
         else:
-            listing += " {}\n".format(target) # original path/ext only included for modules
+            listing += line.format(name, target) # original path/ext is included for modules
 
         return listing
 
