@@ -343,7 +343,7 @@ class FortranProject:
         dep_list = [os.path.splitext(i)[0] + target_ext for i in udep_list]
 
         # build rule for target using dependency list
-        listing = "# {}\n".format(name)
+        listing = "# {}\n".format(target)
         line = "{} : {}\n"
         for dep in dep_list:
             listing += line.format(name, dep)
