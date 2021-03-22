@@ -1,7 +1,39 @@
 
 Python tool to determine Makefile dependencies for a Fortran project.
 
-Based heavily on: https://github.com/ZedThree/fort_depend.py
+Main idea based on: https://github.com/ZedThree/fort_depend.py
+
+Limitations:
+	-all files are assumed to hold either modules or programs,
+	 for example, files that contain only a subroutine definition
+	 are not currently handled correctly.
+
+	-preprocessor is very primitive; it cannot handle compounded/nested
+	 directives, such as, ifdef statements that contain other ifdef
+	 statements:
+		#ifdef VAR1
+		   #ifdef VAR2
+		      <if VAR1 and VAR2>
+		   #else
+		      <if VAR1 and not VAR2>
+		   #endif
+		#endif
+	 it also cannot handle include files that further include, e.g.,
+		main file contains, #include file1
+		and file1 contains, #include file2
+
+	 The currently supported directives include:
+
+	 if/else:
+		#ifdef VARIABLE
+		   <pure Fortran code, no other directives of any kind>
+		#else
+		   <pure Fortran code, no other directives of any kind>
+		#endif
+
+	 include:
+		#include filename
+		where filename contains pure Fortran code, no other directives
 
 This version uses a very basic custom preprocessor written in Python; it
 does not handle every possible directive. The most important directive that
