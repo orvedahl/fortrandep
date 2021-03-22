@@ -8,9 +8,11 @@ If these options are important to you, use this routine as a guide to
 write your own routine, or modify this one accordingly.
 
 Usage:
-    generate_dependencies.py [options] <files>...
+    generate_dependencies.py [options] <objects>...
 
-    <files> is the list of source files to process
+    <objects> is the list of source files to process. If --find-source flag
+    is used, then this list holds the search directories that hold the
+    source files.
 
     Some options listed below require space-separated lists (for better
     function within Makefiles), this can be achieved by using quotes
@@ -27,6 +29,10 @@ Options:
     --search-paths=<p>  String of space separated search paths for preprocessor
     --output=<o>        Specify the filename of the output file [default: depends.mak]
     --build=<d>         Directory where object files will live
+
+    --find-source       Find the source files automatically [default: False]
+    --extensions=<e>    String of space separated extensions to find, e.g., ".f90 .F90"
+    --add-files=<f>     String of space separated files to include after directory search
 """
 from __future__ import print_function
 import os
@@ -47,19 +53,28 @@ def parse_input(entry):
     # real simple (and probably dumb) : assume valid entries have no space, except separator
     return entry.split()
 
-def main(files, preprocess, exclude, ignore, macros, search_paths, output, build):
+def main(objects, preprocess, exclude, ignore, macros, search_paths, output, build,
+         find_source, extensions, add_files):
 
     # parse incoming entries: exclude, ignore, macros, search_paths
     search_paths = parse_input(search_paths)
     exclude      = parse_input(exclude)
     ignore       = parse_input(ignore)
     macros       = parse_input(macros)
+    extensions   = parse_input(extensions)
+    add_files    = parse_input(add_files)
+
+    kwargs = dict(exclude_files=exclude, ignore_modules=ignore,
+                  macros=macros, pp_search_path=search_paths,
+                  use_preprocessor=preprocess, verbose=False)
 
     # parse files for dependencies
-    project = FortranProject(files=files,
-                             exclude_files=exclude, ignore_modules=ignore,
-                             macros=macros, pp_search_path=search_paths,
-                             use_preprocessor=preprocess, verbose=False)
+    if (not find_source):
+        project = FortranProject(files=objects, **kwargs)
+
+    else:
+        project = FortranProject(search_dirs=objects, extensions=extensions,
+                                 add_files=add_files, **kwargs)
 
     # write project dependencies
     project.write(output, overwrite=True, build=build, skip_programs=True)
@@ -68,7 +83,7 @@ if __name__ == "__main__":
     from docopt import docopt
     args = docopt(__doc__)
 
-    files = args['<files>']
+    objects = args['<objects>']
 
     preprocess   = args['--preprocess']
     exclude      = args['--exclude']
@@ -77,5 +92,9 @@ if __name__ == "__main__":
     search_paths = args['--search-paths']
     output       = args['--output']
     build        = args['--build']
+    find_source  = args['--find-source']
+    extensions   = args['--extensions']
+    add_files    = args['--add-files']
 
-    main(files, preprocess, exclude, ignore, macros, search_paths, output, build)
+    main(objects, preprocess, exclude, ignore, macros, search_paths, output, build,
+         find_source, extensions, add_files)

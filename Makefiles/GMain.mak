@@ -86,8 +86,9 @@ mdir = $(tdir)/m
 #----------------------------------------------------------------
 # find/include the GPackage.mak files
 #----------------------------------------------------------------
-f90sources =
-sf90sources =
+f90sources :=
+sf90sources :=
+internal_f90sources :=
 GPack_fil :=
 vpath_loc :=
 
@@ -125,18 +126,13 @@ probin_dirs = . $(src_dirs)
 params_files := $(shell $(python_exe) $(scripts_dir)/find_paramfiles.py $(probin_dirs))
 
 probin.f90: $(params_files) $(probin_template) $(namelist_name)
-ifdef verbose
 	@echo ""
 	@echo "${bold}Writing probin.f90 ...${normal}"
 	$(python_exe) $(scripts_dir)/write_input_params.py -t "$(probin_template)" \
              -o probin.f90 -n $(namelist_name) -p "$(params_files)"
-	@echo ""
-else
-	$(python_exe) $(scripts_dir)/write_input_params.py -t "$(probin_template)" \
-             -o probin.f90 -n $(namelist_name) -p "$(params_files)"
-endif
 
 f90sources += probin.f90
+internal_f90sources += probin.f90
 
 clean::
 	$(RM) -f probin.f90
@@ -147,7 +143,6 @@ endif
 #----------------------------------------------------------------
 ifdef build_info
 build_info.f90:
-ifdef verbose
 	@echo ""
 	@echo "${bold}Writing build_info.f90 ...${normal}"
 	$(python_exe) $(scripts_dir)/makebuildinfo.py \
@@ -157,16 +152,9 @@ ifdef verbose
            --link_line "$(f90_comp) $(f90_link)" \
            --source_home "$(src_dirs)"
 	@echo ""
-else
-	$(python_exe) $(scripts_dir)/makebuildinfo.py \
-           --FCOMP "$(f90_comp)" \
-           --FCOMP_version "$(f90_comp_vers)" \
-           --f90_compile_line "$(f90_comp) $(f90_compile) -c" \
-           --link_line "$(f90_comp) $(f90_link)" \
-           --source_home "$(src_dirs)"
-endif
 
 f90sources += build_info.f90
+internal_f90sources += build_info.f90
 
 clean::
 	$(RM) -f build_info.f90
@@ -175,31 +163,42 @@ endif
 #----------------------------------------------------------------
 # find/include the GPackage.mak files and add locations to vpath
 #----------------------------------------------------------------
-# main src directory
-GPack_fil += $(foreach dir, $(src_dirs), $(dir)/GPackage.mak)
-vpath_loc += $(foreach dir, $(src_dirs), $(dir))
-
-# did not find any GPackage.mak files
-ifndef GPack_fil
-  ifneq ($(MAKECMDGOALS), realclean)
-    ifneq ($(MAKECMDGOALS), clean)
-      GPack_err = "No GPackage.mak found: Set the src_dirs vars"
-      $(error $(GPack_err))
+ifdef find_GPackage_files
+  GPack_fil += $(foreach dir, $(src_dirs), $(dir)/GPackage.mak)
+  ifndef GPack_fil
+    # did not find any GPackage.mak files
+    ifneq ($(MAKECMDGOALS), realclean)
+      ifneq ($(MAKECMDGOALS), clean)
+        ifneq ($(MAKECMDGOALS), purge)
+          GPack_err = "No GPackage.mak found: Set the src_dirs vars"
+          $(error $(GPack_err))
+        endif
+      endif
     endif
   endif
+
+  # include list of all source files
+  include $(GPack_fil)
 endif
 
-# include list of all source files
-include $(GPack_fil)
+# only need to add source directories
+vpath_loc += $(src_dirs)
 
 #----------------------------------------------------------------
 # get object/source files
 #    sf90sources will not go through the dependency checker
 #----------------------------------------------------------------
-objects = $(addprefix $(odir)/, $(sort $(f90sources:.f90=.o)))
-objects += $(addprefix $(odir)/, $(sort $(sf90sources:.f90=.o)))
+# strip file extension, add ".o" suffix, sort & remove duplicates, then add "odir/" prefix
+ifdef find_GPackage_files
+  objects = $(addprefix $(odir)/, $(sort $(addsuffix .o, $(basename $(f90sources)))))
+  objects += $(addprefix $(odir)/, $(sort $(addsuffix .o, $(basename $(sf90sources)))))
+else
+  objects_file := $(tdir)/fortran.objects
+endif
 
+# where to look for each type of file extension
 vpath %.f90 . $(vpath_loc)
+vpath %.F90 . $(vpath_loc)
 
 #----------------------------------------------------------------
 # rule to build the dependency file
@@ -207,9 +206,9 @@ vpath %.f90 . $(vpath_loc)
 #    the dependencies with their full directory path and gets
 #    passed to the script as a space separated list of files
 #----------------------------------------------------------------
+ifdef find_GPackage_files
 $(dep_file): $(f90sources)
 	@if [ ! -d $(tdir) ]; then mkdir -p $(tdir); fi
-ifdef verbose
 	@echo ""
 	@echo "${bold}Writing f90 dependency File ...${normal}"
 	$(python_exe) $(dep_script) --output=$(dep_file) --preprocess \
@@ -221,13 +220,25 @@ ifdef verbose
 		$^
 	@echo ""
 else
+# go find the source files, then build the dependencies
+# make sure the probin/build_info are included and explicitly include "." source dir
+$(dep_file): $(src_dirs) $(internal_f90sources)
+	@if [ ! -d $(tdir) ]; then mkdir -p $(tdir); fi
+	@echo ""
+	@echo "${bold}Writing f90 dependency File ...${normal}"
 	$(python_exe) $(dep_script) --output=$(dep_file) --preprocess \
 		--exclude="$(sf90sources)" \
 		--ignore-mods="$(skip_modules)" \
 		--macros="$(pp_macros)" \
 		--search-paths="$(pp_search_paths)" \
 		--build=$(odir)/ \
-		$^
+	        --find-source --extensions=".f90 .F90" \
+	        --add-files="$(internal_f90sources)" \
+		"." $(src_dirs)
+	@echo ""
+	@echo "${bold}Writing list of object Files ...${normal}"
+	$(python_exe) $(scripts_dir)/find_objects.py $(dep_file) $(objects_file)
+	@echo ""
 endif
 
 # include the dependencies file (which says what depends on what)
@@ -237,7 +248,18 @@ endif
 # the "-include" operates identically to include, but suppresses errors
 ifneq ($(MAKECMDGOALS), realclean)
   ifneq ($(MAKECMDGOALS), clean)
-    -include $(dep_file)
+    ifneq ($(MAKECMDGOALS), purge)
+      -include $(dep_file)
+    endif
+  endif
+endif
+ifndef find_GPackage_files
+  ifneq ($(MAKECMDGOALS), realclean)
+    ifneq ($(MAKECMDGOALS), clean)
+      ifneq ($(MAKECMDGOALS), purge)
+        -include $(objects_file)
+      endif
+    endif
   endif
 endif
 
@@ -245,18 +267,11 @@ endif
 # build executable, i.e., Link
 #----------------------------------------------------------------
 $(exe): $(objects)
-ifdef verbose
 	@echo "${bold}Linking $@ ...${normal}"
 	$(f90_comp) $(f90_link) -o $(exe) $(objects) $(library_flags) $(include_flags)
 	@echo
 	@echo "${bold}${green}SUCCESS${normal}"
 	@echo
-else
-	$(f90_comp) $(f90_link) -o $(exe) $(objects) $(library_flags) $(include_flags)
-	@echo
-	@echo "${bold}${green}SUCCESS${normal}"
-	@echo
-endif
 
 #----------------------------------------------------------------
 # how to build each .o file, i.e., Compile
@@ -264,18 +279,21 @@ endif
 $(odir)/%.o: %.f90
 	@if [ ! -d $(odir) ]; then mkdir -p $(odir); fi
 	@if [ ! -d $(mdir) ]; then mkdir -p $(mdir); fi
-ifdef verbose
 	@echo "${bold}Building $< ...${normal}"
 	$(f90_comp) $(f90_compile) -c $< -o $@ $(include_flags)
-else
+
+# include different extensions
+$(odir)/%.o: %.F90
+	@if [ ! -d $(odir) ]; then mkdir -p $(odir); fi
+	@if [ ! -d $(mdir) ]; then mkdir -p $(mdir); fi
+	@echo "${bold}Building $< ...${normal}"
 	$(f90_comp) $(f90_compile) -c $< -o $@ $(include_flags)
-endif
 
 #----------------------------------------------------------------
 # cleanup
 #----------------------------------------------------------------
 # make will execute even if there exists files named clean, all, etc.
-.PHONY: clean realclean all
+.PHONY: clean realclean purge all
 
 clean::
 	$(RM) -f ./*.o $(odir)/*.o
@@ -285,6 +303,10 @@ clean::
 realclean:: clean
 	$(RM) -rf $(tname)
 	$(RM) -f $(exe)
+
+# somewhat dangerous, depending on what other files there are
+purge: realclean
+	$(RM) -f ./*.exe
 
 #----------------------------------------------------------------
 # debug aide

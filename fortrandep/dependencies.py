@@ -28,7 +28,7 @@ class FortranProject:
     """
     def __init__(self, files=None, exclude_files=None,
                  ignore_modules=None,
-                 search_dirs=None, extensions=None,
+                 search_dirs=None, extensions=None, add_files=None,
                  exec_names=None,
                  macros=None, pp_search_path=None, use_preprocessor=True,
                  name=None, verbose=False):
@@ -45,6 +45,8 @@ class FortranProject:
             Collection of directories to search for source files. Only used if files=None.
         extensions : list
             List of file extensions to search for. Only used if files=None
+        add_files : list
+            List of files to include after search for source files. Only used if files=None.
         exec_names : dict
             Give a mapping of program name to corresponding executable name
         macros : list
@@ -66,7 +68,7 @@ class FortranProject:
             self.name = name
 
         if (files is None):
-            files = self.get_source(search_dirs, extensions)
+            files = self.get_source(search_dirs, extensions, add_files)
         elif (not isinstance(files, list)):
             files = [os.path.relpath(files)]
         else:
@@ -115,7 +117,7 @@ class FortranProject:
         self.depends_by_module = self.get_depends_by_module(verbose)
         self.depends_by_file = self.get_depends_by_file(verbose)
 
-    def get_source(self, search_dirs, extensions):
+    def get_source(self, search_dirs, extensions, add_files):
         """
         Find source files
 
@@ -145,7 +147,16 @@ class FortranProject:
         for d in search_dirs: # seach given directories and find files with given extension
             tmp = os.listdir(d)
             for ext in extensions:
-                files.extend([os.path.relpath(x) for x in tmp if x.endswith(ext)])
+                files.extend([os.path.relpath(os.path.join(d,x)) for x in tmp if x.endswith(ext)])
+
+        if (add_files is not None):
+            if (not isinstance(add_files, list)):
+                files.extend(list(add_files))
+            else:
+                files.extend(add_files)
+
+        # remove any duplicate entries
+        files = list(set(files))
 
         return files
 
@@ -343,7 +354,7 @@ class FortranProject:
         dep_list = [os.path.splitext(i)[0] + target_ext for i in udep_list]
 
         # build rule for target using dependency list
-        listing = "# {}\n".format(target)
+        listing = "#: {}\n".format(target)
         line = "{} : {}\n"
         for dep in dep_list:
             listing += line.format(name, dep)
@@ -378,6 +389,13 @@ class FortranProject:
 
         with open(output, 'w') as mf:
             mf.write(HEADER)
+            mf.write("#\n")
+            if (build is None):
+                mf.write("#: build_dir = \n")
+            else:
+                mf.write("#: build_dir = {}\n".format(build))
+            mf.write("#\n")
+            mf.write("#\n")
 
             # loop over all files and extract the files on which it depends.
             # the dependency list will not include the current file: that is added
