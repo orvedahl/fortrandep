@@ -125,7 +125,7 @@ probin_dirs = . $(src_dirs)
 # get list of all valid _params files
 params_files := $(shell $(python_exe) $(scripts_dir)/find_paramfiles.py $(probin_dirs))
 
-probin.f90: $(params_files) $(probin_template) $(namelist_name)
+probin.f90: $(params_files) $(probin_template)
 	@echo ""
 	@echo "${bold}Writing probin.f90 ...${normal}"
 	$(python_exe) $(scripts_dir)/write_input_params.py -t "$(probin_template)" \
