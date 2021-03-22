@@ -19,7 +19,7 @@
 #
 # A minimal working example for a Makefile would include 4 lines:
 #     src_dirs := <list of directories>
-#     f90_comp := gfortran
+#     f90_compiler := gfortran
 #     MAKEFILE_HOME_DIR := /path/to/FortranDep/Makefiles
 #     include $(MAKEFILE_HOME_DIR)/GMain.mak
 #
@@ -97,7 +97,7 @@ python_exe := python
 # Compiler Settings
 #-------------------------------------------------------------------------
 # Fortran compiler (choices are "gfortran" or "intel" so far)
-f90_comp := REQUIRED
+f90_compiler := REQUIRED
 
 # specify directory where the compiled files will go
 build_dir := _build

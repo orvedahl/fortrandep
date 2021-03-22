@@ -18,7 +18,7 @@ ifndef f90_flags
 
   # set OMP flags
   ifdef OMP
-    f90_flags += -openmp
+    f90_flags += -qopenmp
   endif
 endif
 

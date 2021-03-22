@@ -38,15 +38,15 @@ hostnamef := $(shell hostname -f)
 #----------------------------------------------------------------
 # include some basic compiler info
 #----------------------------------------------------------------
-ifeq ($(findstring gfortran, $(f90_comp)),gfortran)
+ifeq ($(findstring gfortran, $(f90_compiler)),gfortran)
   include $(compiler_dir)/gfortran.mak
   comp_suf := .gfortran
 else
-  ifeq ($(f90_comp), intel)
+  ifeq ($(f90_compiler), intel)
     include $(compiler_dir)/intel.mak
     comp_suf := .intel
   else
-    $(error "Compiler $(f90_comp) is not supported")
+    $(error "Compiler $(f90_compiler) is not supported")
   endif
 endif
 
@@ -146,7 +146,7 @@ build_info.f90:
 	@echo ""
 	@echo "${bold}Writing build_info.f90 ...${normal}"
 	$(python_exe) $(scripts_dir)/makebuildinfo.py \
-           --FCOMP "$(f90_comp)" \
+           --FCOMP "$(f90_compiler)" \
            --FCOMP_version "$(f90_comp_vers)" \
            --f90_compile_line "$(f90_comp) $(f90_compile) -c" \
            --link_line "$(f90_comp) $(f90_link)" \

@@ -3,6 +3,7 @@
 #
 
 # get version
+f90_comp := gfortran
 f90_comp_vers := $(shell $(f90_comp) -v 2>&1 | grep 'version')
 
 ifndef f90_flags
