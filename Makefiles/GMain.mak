@@ -239,6 +239,8 @@ $(dep_file): $(src_dirs) $(internal_f90sources)
 	@echo "${bold}Writing list of object Files ...${normal}"
 	$(python_exe) $(scripts_dir)/find_objects.py $(dep_file) $(objects_file)
 	@echo ""
+clean::
+	$(RM) -f $(objects_file)
 endif
 
 # include the dependencies file (which says what depends on what)

@@ -17,11 +17,22 @@
 #
 #     6) include the main makefile machinery
 #
-# A minimal working example for a Makefile would include 4 lines:
+# A minimal working example for a Makefile could include only 4 lines:
 #     src_dirs := <list of directories>
 #     f90_compiler := gfortran
 #     MAKEFILE_HOME_DIR := /path/to/FortranDep/Makefiles
 #     include $(MAKEFILE_HOME_DIR)/GMain.mak
+#
+# Included targets to help with cleaning:
+#     clean
+#         -removes all compiled object files
+#     realclean
+#         -all elements of clean
+#         -removes the build directory
+#         -removes the executable
+#     purge
+#         -all elements of realclean
+#         -removes all files matching "*.exe"
 #
 # Below are all the user-available options and a short description. Any entry
 # whose value is listed as REQUIRED needs to be changed by the user. All
