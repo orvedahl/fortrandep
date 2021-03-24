@@ -155,17 +155,17 @@ for line in sourceString.splitlines():
             fout.write(newline)
 
         elif (keyword == "BUILD_MACHINE"):
-            newline = line.replace("@@BUILD_MACHINE@@", 
+            newline = line.replace("@@BUILD_MACHINE@@",
                                      build_machine[:MAX_STRING_LENGTH])
             fout.write(newline)
 
         elif (keyword == "FCOMP"):
-            newline = line.replace("@@FCOMP@@", 
+            newline = line.replace("@@FCOMP@@",
                                      FCOMP)
             fout.write(newline)            
 
         elif (keyword == "FCOMP_VERSION"):
-            newline = line.replace("@@FCOMP_VERSION@@", 
+            newline = line.replace("@@FCOMP_VERSION@@",
                                      FCOMP_version[:MAX_STRING_LENGTH])
             fout.write(newline)            
 
@@ -189,7 +189,7 @@ for line in sourceString.splitlines():
             else:
                 str = link_line
 
-            newline = line.replace("@@LINK_LINE@@", 
+            newline = line.replace("@@LINK_LINE@@",
                                      "\"%s\"" % (str))
             fout.write(newline)
 
