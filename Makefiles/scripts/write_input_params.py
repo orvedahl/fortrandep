@@ -14,7 +14,6 @@
 
 from __future__ import print_function
 import sys
-import string
 import getopt
 
 Header ="""
@@ -349,10 +348,10 @@ def write_io_module(probinTemplate, paramFiles, namelistName, outFile):
 #======================================================================
 # error
 #======================================================================
-def error(string):
+def error(msg):
 
     print("\nERROR in write_input_params.py:\n")
-    print("\t"+string+"\n")
+    print("\t"+msg+"\n")
     sys.exit(2)
 
 #======================================================================
