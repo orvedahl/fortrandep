@@ -17,7 +17,6 @@ import sys
 import os
 import getopt
 import datetime
-import string
 import subprocess
 
 sourceString="""
@@ -148,25 +147,25 @@ for line in sourceString.splitlines():
         keyword = line[index+len("@@"):index2]
 
         if (keyword == "BUILD_DATE"):
-            newline = string.replace(line, "@@BUILD_DATE@@", build_date[:MAX_STRING_LENGTH])
+            newline = line.replace("@@BUILD_DATE@@", build_date[:MAX_STRING_LENGTH])
             fout.write(newline)
 
         elif (keyword == "BUILD_DIR"):
-            newline = string.replace(line, "@@BUILD_DIR@@", build_dir[:MAX_STRING_LENGTH])
+            newline = line.replace("@@BUILD_DIR@@", build_dir[:MAX_STRING_LENGTH])
             fout.write(newline)
 
         elif (keyword == "BUILD_MACHINE"):
-            newline = string.replace(line, "@@BUILD_MACHINE@@", 
+            newline = line.replace("@@BUILD_MACHINE@@", 
                                      build_machine[:MAX_STRING_LENGTH])
             fout.write(newline)
 
         elif (keyword == "FCOMP"):
-            newline = string.replace(line, "@@FCOMP@@", 
+            newline = line.replace("@@FCOMP@@", 
                                      FCOMP)
             fout.write(newline)            
 
         elif (keyword == "FCOMP_VERSION"):
-            newline = string.replace(line, "@@FCOMP_VERSION@@", 
+            newline = line.replace("@@FCOMP_VERSION@@", 
                                      FCOMP_version[:MAX_STRING_LENGTH])
             fout.write(newline)            
 
@@ -178,7 +177,7 @@ for line in sourceString.splitlines():
             else:
                 str = f90_compile_line
 
-            newline = string.replace(line, "@@F90_COMP_LINE@@", 
+            newline = line.replace("@@F90_COMP_LINE@@", 
                                      "\"%s\"" % (str))
             fout.write(newline)
 
@@ -190,12 +189,12 @@ for line in sourceString.splitlines():
             else:
                 str = link_line
 
-            newline = string.replace(line, "@@LINK_LINE@@", 
+            newline = line.replace("@@LINK_LINE@@", 
                                      "\"%s\"" % (str))
             fout.write(newline)
 
         elif (keyword == "SOURCE_HASH"):
-            newline = string.replace(line, "@@SOURCE_HASH@@", source_hash)
+            newline = line.replace("@@SOURCE_HASH@@", source_hash)
             fout.write(newline)
 
     else:
