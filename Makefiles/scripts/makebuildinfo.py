@@ -69,10 +69,17 @@ def usage():
 # using a subprocess, run the command "command" in the shell and pipe the 
 # output to standard out to be stored in p 
 def runcommand(command):
-    p = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
-    out = p.stdout.read()
-    return out.strip()
+    p = subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = p.communicate()
 
+    try: # convert to standard string
+        out = out.decode('utf-8')
+        err = err.decode('utf-8')
+    except:
+        out = out
+        err = err
+
+    return out
 
 try: opts, next = getopt.getopt(sys.argv[1:], "",
                                ["FCOMP=",
