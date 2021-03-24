@@ -125,7 +125,7 @@ probin_dirs = . $(src_dirs)
 # get list of all valid _params files
 params_files := $(shell $(python_exe) $(scripts_dir)/find_paramfiles.py $(probin_dirs))
 
-probin.f90: $(params_files) $(probin_template)
+probin.f90:
 	@echo ""
 	@echo "${bold}Writing probin.f90 ...${normal}"
 	$(python_exe) $(scripts_dir)/write_input_params.py -t "$(probin_template)" \
@@ -207,7 +207,7 @@ vpath %.F90 . $(vpath_loc)
 #    passed to the script as a space separated list of files
 #----------------------------------------------------------------
 ifdef find_GPackage_files
-$(dep_file): $(f90sources)
+$(dep_file): $(internal_f90sources) $(f90sources)
 	@if [ ! -d $(tdir) ]; then mkdir -p $(tdir); fi
 	@echo ""
 	@echo "${bold}Writing f90 dependency File ...${normal}"
@@ -222,7 +222,7 @@ $(dep_file): $(f90sources)
 else
 # go find the source files, then build the dependencies
 # make sure the probin/build_info are included and explicitly include "." source dir
-$(dep_file): $(src_dirs) $(internal_f90sources)
+$(dep_file): $(internal_f90sources) $(src_dirs)
 	@if [ ! -d $(tdir) ]; then mkdir -p $(tdir); fi
 	@echo ""
 	@echo "${bold}Writing f90 dependency File ...${normal}"
