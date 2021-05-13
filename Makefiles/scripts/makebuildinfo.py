@@ -79,6 +79,9 @@ def runcommand(command):
         out = out
         err = err
 
+    if (out.endswith("\n")): # don't capture the last carriage return
+        out = out[:-1]
+
     return out
 
 try: opts, next = getopt.getopt(sys.argv[1:], "",

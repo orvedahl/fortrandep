@@ -38,11 +38,11 @@ hostnamef := $(shell hostname -f)
 #----------------------------------------------------------------
 # include some basic compiler info
 #----------------------------------------------------------------
-ifeq ($(findstring gfortran, $(f90_compiler)),gfortran)
+ifeq ($(f90_compiler), $(filter $(f90_compiler), GNU gfortran GCC gnu))
   include $(compiler_dir)/gfortran.mak
   comp_suf := .gfortran
 else
-  ifeq ($(f90_compiler), intel)
+  ifeq ($(f90_compiler), $(filter $(f90_compiler), Intel ifort intel))
     include $(compiler_dir)/intel.mak
     comp_suf := .intel
   else
