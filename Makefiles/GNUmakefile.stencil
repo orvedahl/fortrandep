@@ -112,7 +112,7 @@ f90_compiler := REQUIRED
 
 # compiler executable that will be used to do compile/linking stages
 # defaults to "gfortran" or "ifort" based on value of f90_compiler
-#f90_comp := /some/user/defined/prefix/gfortran
+#compiler_exe := /some/user/defined/prefix/gfortran
 
 # specify directory where the compiled files will go
 build_dir := _build

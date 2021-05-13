@@ -3,7 +3,11 @@
 #
 
 # get version
-f90_comp := ifort
+ifndef compiler_exe
+  f90_comp := ifort
+else
+  f90_comp := $(compiler_exe)
+endif
 f90_comp_vers := $(shell $(f90_comp) -V 2>&1 | grep 'Version')
 
 intel_dbg = -FR -r8 -O0 -traceback -g -check all -noinline -debug all -warn all -shared-intel
