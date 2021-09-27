@@ -38,15 +38,20 @@ hostnamef := $(shell hostname -f)
 #----------------------------------------------------------------
 # include some basic compiler info
 #----------------------------------------------------------------
-ifeq ($(f90_compiler), $(filter $(f90_compiler), GNU gfortran GCC gnu))
+ifeq ($(f90_compiler), $(filter $(f90_compiler), GNU gfortran GCC gnu gcc))
   include $(compiler_dir)/gfortran.mak
   comp_suf := .gfortran
 else
-  ifeq ($(f90_compiler), $(filter $(f90_compiler), Intel ifort intel))
+  ifeq ($(f90_compiler), $(filter $(f90_compiler), Intel ifort intel INTEL))
     include $(compiler_dir)/intel.mak
     comp_suf := .intel
   else
-    $(error "Compiler $(f90_compiler) is not supported")
+    ifeq ($(f90_compiler), $(filter $(f90_compiler), CUSTOM custom Custom))
+      include $(compiler_dir)/custom.mak
+      comp_suf := .custom
+    else
+      $(error "Compiler $(f90_compiler) is not supported")
+    endif
   endif
 endif
 

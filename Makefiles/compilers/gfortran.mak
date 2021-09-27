@@ -26,8 +26,6 @@ ifndef f90_flags
   ifdef OMP
     f90_flags += -fopenmp
   endif
-else
-  f90_flags :=
 endif
 
 f90_flags += $(xtr_f90_flags)
