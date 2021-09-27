@@ -46,11 +46,16 @@ else
     include $(compiler_dir)/intel.mak
     comp_suf := .intel
   else
-    ifeq ($(f90_compiler), $(filter $(f90_compiler), CUSTOM custom Custom))
-      include $(compiler_dir)/custom.mak
-      comp_suf := .custom
+    ifeq ($(f90_compiler), $(filter $(f90_compiler), PGI pgi pgf90 pgfortran))
+      include $(compiler_dir)/pgi.mak
+      comp_suf := .pgi
     else
-      $(error "Compiler $(f90_compiler) is not supported")
+      ifeq ($(f90_compiler), $(filter $(f90_compiler), CUSTOM custom Custom))
+        include $(compiler_dir)/custom.mak
+        comp_suf := .custom
+      else
+        $(error "Compiler $(f90_compiler) is not supported")
+      endif
     endif
   endif
 endif
