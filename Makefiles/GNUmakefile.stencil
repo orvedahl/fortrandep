@@ -4,24 +4,13 @@
 # Required elements:
 #     1) specify src_dirs: list of directories where source code can be found
 #
-#     2) choose if using the probin and/or info modules (build_probin, build_info)
-#            these choices have implications for dependencies and what is built
+#     2) choose compiler
 #
-#            the default behavior is to not use either one
+#     3) set MAKEFILE_HOME_DIR so it points to the directory containing this stencil
 #
-#     3) specify any modules that the dependency checker should skip, default is none
+#     4) include the main makefile machinery
 #
-#     4) choose compiler, flags, include dirs, library dirs, etc.
-#
-#     5) set MAKEFILE_HOME_DIR at the bottom
-#
-#     6) include the main makefile machinery
-#
-# A minimal working example for a Makefile could include only 4 lines:
-#     src_dirs := <list of directories>
-#     f90_compiler := GNU
-#     MAKEFILE_HOME_DIR := /path/to/FortranDep/Makefiles
-#     include $(MAKEFILE_HOME_DIR)/GMain.mak
+# A minimal working example is found in "GNUmakefile.stencil.minimal"
 #
 # Included targets to help with cleaning:
 #     clean
@@ -36,53 +25,59 @@
 #
 # Below are all the user-available options and a short description. Any entry
 # whose value is listed as REQUIRED needs to be changed by the user. All
-# other variables are shown with their default value.
+# other variables are shown with their default value
 #
 
 ##########################################################################
 # what to build
 ##########################################################################
 
-# space-separated list of directories that hold source files
+# Space-separated list of directories that hold source files. Both relative
+# and absolute paths are supported
 src_dirs := REQUIRED
 
-# determine whether to use the crude input parameter namelist option.
-# this is awesome for quick/dirty projects, but not refined enough for
+# Determine whether to use the crude input parameter namelist option.
+# This is great for quick/dirty projects, but not refined enough for
 # complex ones
 build_probin :=
 namelist_name := input
 
-# determine whether to use the crude build-info module to make compiler
+# Determine whether to use the crude build-info module to make compiler
 # information available in the Fortran code through a module
 build_info :=
 
-# executable basename, will be modified unless "do_not_modify_exe_name := t"
+# Executable basename, will be modified unless "do_not_modify_exe_name := t"
 # an example modification would be: xmain.Linux.gfortran.debug.exe
 exe_base := main
 do_not_modify_exe_name :=
 
-# set what source files to include in the build. There are two options:
-#     1) have the build system automatically find the source files,
-#        this could lead to processing far more files than is necessary
+# Set what source files to include in the build. There are two options:
+#     1) Have the build system automatically find the source files, this could
+#        lead to processing far more files than are actually used in the project
+#        (see note below about sf90sources to avoid some of this)
 #
 #        this is the default and requires no changes, it will find *.f90 and *.F90
 #
-#     2) explicitly tell build system what files to process.
-#        each directory should have a file called "GPackage.mak" that
+#     2) Explicitly tell build system what files to process.
+#        Each directory should have a file called "GPackage.mak" that
 #        defines the source files to include. It is formatted as follows:
 #            f90sources += filename1.f90
 #            f90sources += filename2.F90
 #            sf90sources += filename3.F90
 #        with one entry per line and the path to the file is not required.
-#        entries that use "sf90sources" will not go through the dependency checker.
-#        both "*.f90" and "*.F90" extensions are supported.
+#        Entries that use "sf90sources" will not go through the dependency checker,
+#        but will be included. Both "*.f90" and "*.F90" extensions are supported
 find_GPackage_files :=
+
+# Do not include or process these files. Only used if "find_GPackage_files := "
+# Space-separated list of relative filenames to ignore and filter out
+ignore_files :=
 
 ##########################################################################
 # dependencies
 ##########################################################################
-# list of modules to skip when running through the automated dependency
-# generator. if a file contains:
+# List of modules to skip when running through the automated dependency
+# generator. If a file contains:
 #       use omp
 #       use mpi
 #       use my_freq
@@ -91,35 +86,35 @@ find_GPackage_files :=
 # then the generator will not search for a file that contains a module 
 # named "omp" or a file containing module named "mpi" but it will search 
 # for a file containing module "my_freq". This allows "system" modules
-# to still be used.
+# to still be used
 skip_modules :=
 
 ##########################################################################
 # how to build
 ##########################################################################
 
-# run in debug mode, determines which default flags to use
+# Run in debug mode, determines which default flags to use
 debug :=
 
-# what command will run a python script, e.g., python, python3, python2, etc.
+# What command will run a python script, e.g., python, python3, python2, etc.
 python_exe := python
 
 #-------------------------------------------------------------------------
 # Compiler Settings
 #-------------------------------------------------------------------------
-# Fortran compiler (choices are "GNU" or "Intel" so far)
+# Fortran compiler (choices are "GNU" or "Intel" or "PGI" or "Custom")
 f90_compiler := REQUIRED
 
-# compiler executable that will be used to do compile/linking stages
-# defaults to "gfortran" or "ifort" based on value of f90_compiler
+# Compiler executable that will be used to do compile/linking stages
+# defaults to "gfortran", "ifort", or "pgfortran" based on value of f90_compiler
 #compiler_exe := /some/user/defined/prefix/gfortran
 
-# specify directory where the compiled files will go
+# Specify directory where the compiled files will go
 build_dir := _build
 
-# set compiler flags manually or leave blank to use defaults. defaults
+# Set compiler flags manually or leave blank to use defaults. Defaults
 # only exist for Intel and GNU compilers.
-# if manually setting, a useful block to include will be
+# If manually setting, a useful block to include will be
 #     ifdef debug
 #       f90_flags := <set debug flags here>
 #     else
@@ -127,25 +122,25 @@ build_dir := _build
 #     endif
 f90_flags :=
 
-# include the OpenMP compiler flag, only used if f90_flags is not set
+# Include the OpenMP compiler flag, only used if f90_flags is not set
 OMP :=
 
-# include extra flags (these will always be added on)
+# Include extra flags (these will always be added on)
 xtr_f90_flags :=
 
-# set include directories, e.g., -I<some dir>
+# Set include directories, e.g., -I<some dir>
 include_flags :=
 
-# set library flags here, e.g., -L<some dir> -llib1 -llib2 libmylib.so
+# Set library flags here, e.g., -L<some dir> -llib1 -llib2 libmylib.so
 library_flags :=
 
 #-------------------------------------------------------------------------
 # Preprocessor Settings
 #-------------------------------------------------------------------------
-# space separated list of places where the preprocessor can find "#include" files
+# Space-separated list of places where the preprocessor can find "#include" files
 pp_search_paths :=
 
-# space separated list of user defined preprocessor macros
+# Space-separated list of user defined preprocessor macros
 # each macro should be name=value, with no spaces, for example
 #     pp_macros := INTEL_COMPILER=1 OUTPUT_DIR=/home/user/
 pp_macros :=
@@ -153,7 +148,7 @@ pp_macros :=
 ##########################################################################
 # include the rest of the Makefile
 ##########################################################################
-# this variable must be defined and point to the top Makefile directory
+# This variable must be defined and point to the top Makefile directory
 MAKEFILE_HOME_DIR := REQUIRED
 
 # REQUIRED: this line needs no modification, but must be included

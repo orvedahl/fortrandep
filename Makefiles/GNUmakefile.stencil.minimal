@@ -1,0 +1,28 @@
+#
+# General Makefile showing only the required elements
+#
+# Included targets to help with cleaning:
+#     clean
+#         -removes all compiled object files
+#     realclean
+#         -all elements of clean
+#         -removes the build directory
+#         -removes the executable
+#     purge
+#         -all elements of realclean
+#         -removes all files matching "*.exe"
+#
+##########################################################################
+
+# Space-separated list of directories that hold source files
+src_dirs := REQUIRED
+
+# Fortran compiler (choices are "GNU" or "Intel" or "PGI" or "Custom")
+f90_compiler := REQUIRED
+
+# Point to the top Makefile directory, which contains this stencil
+MAKEFILE_HOME_DIR := REQUIRED
+
+# REQUIRED: this line needs no modification, but must be included
+include $(MAKEFILE_HOME_DIR)/GMain.mak
+

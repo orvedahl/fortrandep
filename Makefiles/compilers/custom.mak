@@ -1,5 +1,5 @@
 #
-# makefile rules surounding gfortran
+# makefile rules for a custom compiler
 #
 
 # get version
@@ -16,7 +16,10 @@ endif
 
 f90_flags += $(xtr_f90_flags)
 
-# make sure modules/object files are found/included
+# The "-I$(mdir)" tells the compiler where to find compiled modules.
+# Be sure the compiler places the compiled module in the $(mdir) directory.
+#     intel uses the "-module <dir>" syntax
+#     gfortran uses "-J <dir>" syntax
 f90_compile = $(f90_flags) -I$(mdir)
 f90_link = $(f90_flags) -I$(mdir)
 

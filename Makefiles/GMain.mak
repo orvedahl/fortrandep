@@ -97,7 +97,6 @@ mdir = $(tdir)/m
 # find/include the GPackage.mak files
 #----------------------------------------------------------------
 f90sources :=
-sf90sources :=
 internal_f90sources :=
 GPack_fil :=
 vpath_loc :=
@@ -237,7 +236,7 @@ $(dep_file): $(internal_f90sources) $(src_dirs)
 	@echo ""
 	@echo "${bold}Writing f90 dependency File ...${normal}"
 	$(python_exe) $(dep_script) --output=$(dep_file) --preprocess \
-		--exclude="$(sf90sources)" \
+		--exclude="$(ignore_files)" \
 		--ignore-mods="$(skip_modules)" \
 		--macros="$(pp_macros)" \
 		--search-paths="$(pp_search_paths)" \

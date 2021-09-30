@@ -1,8 +1,5 @@
 module input_params
 
-   use data_types
-   use variables
-
    implicit none
 
    private

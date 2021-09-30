@@ -223,7 +223,7 @@ def write_io_module(probinTemplate, paramFiles, namelistName, outFile):
 
                     if (type == "real"):
                         fout.write(\
-                             "%sreal(kind=dpt), save, public :: %s = %s\n" % \
+                             "%sreal, save, public :: %s = %s\n" % \
                              (indent, params[n].var, params[n].value))
 
                     elif (type == "character"):
