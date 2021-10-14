@@ -46,7 +46,7 @@ else
     include $(compiler_dir)/intel.mak
     comp_suf := .intel
   else
-    ifeq ($(f90_compiler), $(filter $(f90_compiler), PGI pgi pgf90 pgfortran))
+    ifeq ($(f90_compiler), $(filter $(f90_compiler), PGI pgi pgf90 pgfortran NVHPC nvhpc nvfortran))
       include $(compiler_dir)/pgi.mak
       comp_suf := .pgi
     else
