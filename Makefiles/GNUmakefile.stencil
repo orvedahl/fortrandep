@@ -110,7 +110,11 @@ f90_compiler := REQUIRED
 #compiler_exe := /some/user/defined/prefix/gfortran
 
 # Specify directory where the compiled files will go
+#     Module files will be placed in $(build_dir)/$(sub_dir)/m
+#     Object files will be placed in $(build_dir)/$(sub_dir)/o
+# The sub_dir default is system dependent, e.g., "Linux.intel" or "Linux.gfortran.debug"
 build_dir := _build
+sub_dir :=
 
 # Set compiler flags manually or leave blank to use defaults. Defaults
 # only exist for Intel and GNU compilers.

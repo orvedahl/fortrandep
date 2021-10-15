@@ -89,7 +89,11 @@ ifndef build_dir
 else
   tname = $(build_dir)
 endif
-tdir = $(tname)/$(suf)
+ifndef sub_dir
+  tdir = $(tname)/$(suf)
+else
+  tdir = $(tname)/$(sub_dir)
+endif
 odir = $(tdir)/o
 mdir = $(tdir)/m
 
