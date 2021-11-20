@@ -1,0 +1,5 @@
+source : src1/main.f90
+source : src2/vars.f90
+source : src2/moduleC.f90
+source : data_types.f90
+ignore : mpi

@@ -36,10 +36,10 @@ To add a new test:
              .
 
        the dots indicate "repeat as necessary", ordering of lines is unimportant.
-           source = an actual source file
-           exclude = a file to ignore
-           ignore = the name of a module to ignore (not the filename)
-           macro = define a preprocessor macro for use with #ifdef and #ifndef
+           'source' refers to an actual source file
+           'exclude' refers to a file that will be ignored
+           'ignore' references the name of a module to ignore (not the filename)
+           'macro' defines a preprocessor macro
 
     4) run this test suite as "python run_tests.py"
 
@@ -64,17 +64,24 @@ colors = {
     "end"       : '\033[0m',
 }
 def print_color(text, color):
+    """
+    Print the text string to standard output in the given color
+    """
     if (color not in colors.keys()):
         raise KeyError("Color = {} not defined".format(color))
     x = '{}{}{}'.format(colors[color], text, colors["end"])
     print(x)
 
 def parse_input(tdir):
+    """
+    Parse the "source_files.txt" file in the given directory for the
+    test parameters.
+    """
+    sources = []
+    excludes = []
+    ignores = []
+    macros = []
     with open(os.path.join(tdir, "source_files.txt"), "r") as f:
-        sources = []
-        excludes = []
-        ignores = []
-        macros = []
         for line in f:
             fields = line.split(":")
             entry = fields[1].strip()
@@ -94,8 +101,61 @@ def parse_input(tdir):
 
     return sources, excludes, ignores, macros
 
-def main():
+def compare_files(file1, file2):
+    """
+    Determine if the two files contain the same dependency information
+    """
 
+    entries1 = {}
+    with open(file1, "r") as f:
+        for line in f:
+            if (line.lstrip().startswith("#")): continue
+            if (line.strip() == ""): continue
+
+            entries = line.split(":")
+            obj = entries[0].strip()
+            dep = entries[1].strip()
+            if (obj not in entries1.keys()):
+                entries1[obj] = [dep]
+            else:
+                if (dep not in entries1[obj]):
+                    entries1[obj].append(dep)
+                else:
+                    e = "{} contains two entries for {} : {}"
+                    print(e.format(file1, obj, dep))
+
+    for k in entries1.keys():
+        entries1[k].sort()
+
+    entries2 = {}
+    with open(file2, "r") as f:
+        for line in f:
+            if (line.lstrip().startswith("#")): continue
+            if (line.strip() == ""): continue
+
+            entries = line.split(":")
+            obj = entries[0].strip()
+            dep = entries[1].strip()
+            if (obj not in entries2.keys()):
+                entries2[obj] = [dep]
+            else:
+                if (dep not in entries2[obj]):
+                    entries2[obj].append(dep)
+                else:
+                    e = "{} contains two entries for {} : {}"
+                    print(e.format(file2, obj, dep))
+
+    for k in entries2.keys():
+        entries2[k].sort()
+
+    return entries1 == entries2
+
+def main():
+    """
+    Run all the tests and determine which ones pass/fail
+    """
+
+    # paths to where #include files can be found
     search_paths = ["include"]
 
     tests = OrderedDict() # key is directory, value is dictionary of test parameters
@@ -142,14 +202,24 @@ def main():
     tests["test-16"] = {"build":"build",
                        "note":['multifile project', 'multiple src/', 'ignore mod',
                                'build specified', 'include file', 'exclude file']}
+    #--
+    tests["pp-test-16"] = {"build":"odir",
+                           "note":['multifile project', 'multiple src/', 'ignore mod',
+                                   'build specified', 'nested #ifdef & one defined']}
+    tests["pp-test-17"] = {"build":"odir",
+                           "note":['multifile project', 'multiple src/', 'ignore mod',
+                                   'build specified', 'nested #ifdef & other one defined']}
+    tests["pp-test-18"] = {"build":"odir",
+                           "note":['multifile project', 'multiple src/', 'ignore mod',
+                                   'build specified', 'nested #ifdef & neither defined']}
 
     verbose = True
     print_dependencies = False
 
     passed = 0
     n_tests = len(tests.keys())
-    for tdir in tests.keys():
-        print("Running: ", end='')
+    for tdir in tests.keys(): # loop over each test directory
+        print("\nRunning: ", end='')
         print_color("{}".format(tdir), "bold")
         if (verbose):
             if ("note" in tests[tdir].keys()):
@@ -157,22 +227,34 @@ def main():
                 for x in tests[tdir]["note"]:
                     print("\t\t{}".format(x))
 
+        # find the parameters for this test
         files, excludes, ignores, macros = parse_input(tdir)
 
-        files = [os.path.join(tdir, f) for f in files]
+        files = [os.path.join(tdir, f) for f in files] # give appropriate path to all files
 
+        # build the project
         P = FortranProject(name=tdir, files=files, exclude_files=excludes,
                            ignore_modules=ignores, macros=macros,
                            pp_search_path=search_paths, verbose=print_dependencies)
 
+        # write the dependency file to the proper directory
         build = tests[tdir].pop("build", None)
         P.write(os.path.join(tdir, "depends.mak"), overwrite=True, build=build)
 
-        if (P.success):
-            print("\t",end=''); print_color("Pass", "green")
-            passed += 1
-        else:
-            print("\t",end=''); print_color("Fail", "green")
+        if (P.success): # dependency file was written successfully
+
+            # check for correctness
+            success = compare_files(os.path.join(tdir, "depends.mak"),
+                                    os.path.join(tdir, "solution.mak"))
+
+            if (success):
+                print("\t",end=''); print_color("Pass", "green")
+                passed += 1
+            else:
+                print("\t",end=''); print_color("Fail", "red")
+
+        else: # dependency file was not written
+            print("\t",end=''); print_color("Failed to write", "red")
 
     print("\nSuccessful tests: {}".format(passed))
     print("Total tests run : {}\n".format(n_tests))

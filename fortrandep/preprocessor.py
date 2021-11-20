@@ -2,6 +2,7 @@
 Basic preprocessor tools for Fortran files
 """
 from __future__ import print_function
+from collections import OrderedDict
 import os
 
 class FortranPreprocessor:
@@ -15,7 +16,7 @@ class FortranPreprocessor:
     search_paths : list
         List of search paths to look for included files
     """
-    def __init__(self, search_paths=None, macros=None):
+    def __init__(self, search_paths=["."], macros=None):
         """
         Args
         ----
@@ -75,7 +76,9 @@ class FortranPreprocessor:
         path : str
             search path to include
         """
-        self.search_paths.append(os.path.abspath(path))
+        p = os.path.expanduser(path) # expand "~" into HOME
+        p = os.path.expandvars(p)    # expand environment variables
+        self.search_paths.append(os.path.abspath(p))
 
         # ensure there are no duplicates
         self.search_paths = list(set(self.search_paths))
@@ -84,13 +87,14 @@ class FortranPreprocessor:
         """
         Replace preprocessor directives with their definitions. Supported directives:
 
+            + #include "filename" : included files are simply copied over and not processed,
+                 with the exception of any if blocks
             + #ifdef VARIABLE : only if-endif or if-else-endif blocks, no elif statements
             + #ifndef VARIABLE : only if-endif or if-else-endif blocks, no elif statements
-            + #include "filename" : included files are simply copied over and not processed
 
         In the case of if blocks, the "correct" code is included, the "invalid" code
         is simply ignored and not retained. For include directives, the included file
-        contents are simply copied over, it is not processed for more directives.
+        contents are simply copied over, it is not processed for more directives (except if-endif).
 
         Args
         ----
@@ -102,10 +106,52 @@ class FortranPreprocessor:
         contents : list
             The preprocessed file contents; each entry in the list is a line
         """
-        contents = self._parse_if_directives(text)
+        # parse for directives
+        contents = self._parse_include_directives(text)
+        contents = self._parse_define_directives(contents)
+        contents = self._parse_if_directives(contents)
 
-        contents = self._parse_include_directives(contents)
+        # reverse sort of macros by length of their name
+        sorted_macros = sorted(self.macros, key=lambda name : len(name))[::-1]
 
+        # change macros that appear in the source code, outside of directives
+        for i in range(len(contents)):
+            for name in sorted_macros: # replace macros with the longest name first
+                if (name in contents[i]):
+                    contents[i] = contents[i].replace(name, self.macros[name])
+
+        return contents
+
+    def _parse_define_directives(self, text):
+        """
+        Parse Fortran file for define directives
+
+        Args
+        ----
+        text : list
+            Text of the file to parse; each entry in the list is a line in the file
+
+        Returns
+        -------
+        contents : list
+            The preprocessed file contents; each entry in the list is a line
+        """
+        contents = []
+        for i,Line in enumerate(text):
+            line = Line.lower()
+            if (line.lstrip().startswith("#define")):
+                ind = line.find("define") # extract the macro name and value
+                entry = Line[ind+len("define"):].strip()
+                values = entry.split(maxsplit=1)
+                name = values[0]
+                if (len(values) == 1):
+                    value = 1
+                else:
+                    value = values[1]
+
+                self.define("{}={}".format(name,value))
+            else:
+                contents.append(Line)
         return contents
 
     def _parse_if_directives(self, text):
@@ -123,42 +169,87 @@ class FortranPreprocessor:
             The preprocessed file contents; each entry in the list is a line
         """
         contents = []
-        indices = {"ifdef_ifndef":[], "endif":[]}
+        indices = {"ifs":[], "endif":[]}
 
         # find the start/end indices of each if block
         for i,Line in enumerate(text):
             line = Line.lower()
             if (line.lstrip().startswith("#")):
 
-                if (("ifdef" in line) or ("ifndef" in line)):
-                    indices["ifdef_ifndef"].append(i)
+                if (("ifdef" in line) or ("ifndef" in line) or ("#if" in line)):
+                    indices["ifs"].append(i)
 
                 if ("endif" in line):
                     indices["endif"].append(i)
 
-        if (len(indices["ifdef_ifndef"]) != len(indices["endif"])):
+        if (len(indices["ifs"]) != len(indices["endif"])):
             e = "ERROR: mismatch between if and endif statements, {} ifs and {} endifs"
-            raise SyntaxError(e.format(len(indices["ifdef_ifndef"]), len(indices["endif"])))
+            raise SyntaxError(e.format(len(indices["ifs"]), len(indices["endif"])))
+
+        # extract if/endif index lists into collection of paired indices
+        # for example:
+        #     ...
+        #     #ifdef 1       line 17 (rather arbitrary line numbers...)
+        #        ...
+        #        #ifdef 2    line 23
+        #           ...
+        #        #endif 2    line 27
+        #        ...
+        #        #ifdef 3    line 35
+        #           ...
+        #        #endif 3    line 40
+        #        ...
+        #     #endif 1       line 50
+        #     ...
+        # produces: indices["ifs"] = [17, 23, 35] & indices["endif"] = [27, 40, 50]
+        # iterate over ifdef indices in reverse, i.e., start with line 35. The
+        # corresponding endif index will be the first endif index that is larger
+        # than 35, i.e., 40. Now remove 40 from the list. The second-to-last ifdef
+        # index, 23, will have corresponding endif index that is the first endif index
+        # larger than 23 of the remaining endif indices, which is 27. Remove 27 from the
+        # list, which only leaves endifs = [50]. The last ifdef index, 17, will be the
+        # first index that is larger than 17 of those that remain, i.e., 50. So the
+        # proper ifdef/endif pairs would be: [(35,40), (23,27), (17,50)]
+        if_index_pairs = []
+        for i in indices["ifs"][::-1]:
+            start_if = i
+
+            # find all endif indices larger than start, and sort them
+            end_ifs = [x for x in indices["endif"] if x > start_if]
+            end_ifs.sort()
+
+            # extract the first index that is larger than start and remove it
+            end_if = end_ifs[0]
+            indices["endif"].remove(end_if)
+
+            if_index_pairs.append([start_if, end_if]) # shape (Nifs, 2)
+
+        parsed_text = text.copy() # avoid changing the input by using a copy, not a reference
 
         # process the ifdef/ifndef directives
-        Nifs = len(indices["ifdef_ifndef"])
-        s = 0
+        Nifs = len(if_index_pairs)
         for i in range(Nifs):
 
-            start = indices["ifdef_ifndef"][i] # index to #ifdef & #ifndef
-            end = indices["endif"][i]          # index to #endif
+            start = if_index_pairs[i][0] # index to #if...
+            end = if_index_pairs[i][1]   # index to #endif
 
-            use_code = self._parse_single_if(text[start:end+1]) # include text[end] line
+            if_text = parsed_text[start:end+1] # include the #endif line
 
-            contents.extend(text[s:start]) # add code outside if blocks, exclude the text[start] line
-            contents.extend(use_code)      # add proper code from the if block
+            use_code, Nremoved = self._parse_single_if(if_text)
 
-            s = end+1 # update new starting point, which will be included
+            # swap out the if statement text for the correct code
+            parsed_text = parsed_text[:start] + use_code + parsed_text[end+1:]
 
-        # add last part of file that is outside the if block
-        contents.extend(text[s:])
+            # code length has changed so update the remaining if indices
+            for j in range(i+1,Nifs):
+                s = if_index_pairs[j][0]
+                e = if_index_pairs[j][1]
+                if (s > end):
+                    if_index_pairs[j][0] = s - Nremoved
+                if (e > end):
+                    if_index_pairs[j][1] = e - Nremoved
 
-        return contents
+        return parsed_text
 
     def _parse_single_if(self, text):
         """
@@ -175,34 +266,50 @@ class FortranPreprocessor:
             #else
                 code_3
             #endif
-        In these examples, if VARIABLE is defined, then code_1 and code_3 will be returned.
-        If VARIABLE is not defined, then only code_2 will be returned, code_1 would be ignored.
+        and
+            #if defined(VARIABLE)
+                code_4
+            #endif
+        In these examples, if VARIABLE is defined, then code_1, code_3, and code_4 will be returned.
+        If VARIABLE is not defined, then only code_2 will be returned, other code_? would be ignored.
 
         Args
         ----
         text : list
-            Text of the if block to parse
+            Text of the if block to parse, starting with "#if..." and concluding with "#endif"
 
         Returns
         -------
         contents : list
             The valid code contents where unused code has been removed
+        Nremoved: int
+            The number of lines that were ignored from the input list.
         """
+        Ninput = len(text)
+
+        if (Ninput < 1): # input is empty, so return empty
+            return [], 0
+
+        name = None
+        if_type = None
+
         first_block = []
         second_block = []
         for Line in text:
             line = Line.lower()
-            if (line.lstrip().startswith("#") and ("ifdef" in line or "ifndef" in line)):
+            if (line.lstrip().startswith("#if")):
                 first = True
                 if ("ifndef" in line):
                     if_type = 'ndef'
                     ind = line.find("ifndef") # extract the macro variable name
                     name = Line[ind+len("ifndef"):].strip()
-                else:
+                elif ("ifdef" in line):
                     if_type = 'def'
                     ind = line.find("ifdef") # extract the macro variable name
                     name = Line[ind+len("ifdef"):].strip()
+
                 continue
+
             if (line.lstrip().startswith("#") and "else" in line):
                 first = False
                 continue
@@ -218,9 +325,14 @@ class FortranPreprocessor:
 
         # select the proper block of code
         if (((if_type == "def") and is_defined) or ((if_type == "ndef") and (not is_defined))):
-            return first_block
+            use_first = True
         else:
-            return second_block
+            use_first = False
+
+        if (use_first):
+            return first_block, Ninput - len(first_block)
+        else:
+            return second_block, Ninput - len(second_block)
 
     def _parse_include_directives(self, text):
         """
