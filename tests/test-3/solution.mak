@@ -1,10 +1,3 @@
-#
-# This file is generated automatically. DO NOT EDIT!
-#
-#
-#: build_dir = 
-#
-#
 #: test-3/variables.f90
 test-3/variables.o : test-3/variables.f90
 #: test-3/main.f90

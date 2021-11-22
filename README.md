@@ -170,19 +170,23 @@ statement. All supported if-else-endif statements can appear in the included fil
 supported are any `#define` statements, but there are some restrictions.
 
 ### Define Statments
-Defining macros using the `#define <name> <value>` form is supported. Only simple "substitution"
-type macros are supported. Macros such as function definitions are not yet supported. Conditional
-definitions are not supported, such as:
+Defining macros using the `#define <name> <value>` form is supported. Only simple
+"substitution" type macros are supported. Macros such as function definitions are not yet
+supported. Conditional definitions are fully supported, for example:
 ```
 #ifndef VARIABLE
   #define VARIABLE
+#endif
+
+#ifdef VARIABLE
+  ...
 #endif
 ```
 
 ### If Statements
 Standard `#ifdef - #else - #endif` statements as well as the `#ifndef` variation are
-supported. More complex `#elif` statements are not supported. The if statements can be nested.
-such as:
+supported. More complex `#elif` statements are not supported. The if statements can be
+nested, for example:
 ```
 #ifdef INTEL_COMPILER
   use intel_version
@@ -197,15 +201,17 @@ such as:
 
 ### Important Notes
 The directives are processed in a particular order which has important implications for
-understanding bugs. The order-of-operations is:
+understanding and fixing bugs. The order-of-operations is:
 
 * process all `#include` statements by simply copying the contents of the included file.
-* process all `#define` statements.
-* process all `#ifdef` and `#ifndef` statements, included nested if statements.
+* process all `#define` statements that do not occur inside an if block.
+* process all `#ifdef` and `#ifndef` statements, including nested if statements. After
+   evaluation of a single if block, any `#define` directives contained in the surviving
+   code will be parsed, allowing for conditional definitions.
 
 As a result of this ordering, included files can only use `#ifdef`, `#ifndef`, and `#define`
-directives. Any code inside any if statement must be pure Fortran and contain no other
-directives.
+directives. The only supported directives that may appear inside an if statement are:
+other if blocks, `#include` directives, and `#define` directives.
 
 ### Example Usage
 To use the preprocessor, make sure the path to the `fortrandep` directory is included in
@@ -330,3 +336,14 @@ cp depends.mak solution.mak
 It is **very important** that you inspect the `solution.mak` file for accuracy, as this
 will be used to test the accuracy of future versions of the `FortranDep` project.
 
+An alternative method, is to write the `solution.mak` file from scratch using the existing
+files as a template. Any line that starts with `#` will not be processed and all blank
+lines are skipped as well. The syntax is that of a standard makefile:
+```
+/path/to/target : /path/to/dependency
+```
+with a single target-dependency pair per line; multiple dependencies cannot occur on the
+same line.
+Usually the `target` will be an object file contained in a directory common to all objects.
+The `dependency` will include the Fortran source file as well as any objects on which
+it depends. This alternative method should be considered the "best practices" method.

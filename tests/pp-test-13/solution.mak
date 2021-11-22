@@ -1,10 +1,3 @@
-#
-# This file is generated automatically. DO NOT EDIT!
-#
-#
-#: build_dir = odir
-#
-#
 #: pp-test-13/data_types.f90
 odir/data_types.o : pp-test-13/data_types.f90
 #: pp-test-13/src2/vars.f90

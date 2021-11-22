@@ -1,10 +1,3 @@
-#
-# This file is generated automatically. DO NOT EDIT!
-#
-#
-#: build_dir = _build/debug/odir
-#
-#
 #: test-7/data_types.f90
 _build/debug/odir/data_types.o : test-7/data_types.f90
 #: test-7/src2/vars.f90

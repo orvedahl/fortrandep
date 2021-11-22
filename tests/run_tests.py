@@ -212,6 +212,14 @@ def main():
     tests["pp-test-18"] = {"build":"odir",
                            "note":['multifile project', 'multiple src/', 'ignore mod',
                                    'build specified', 'nested #ifdef & neither defined']}
+    tests["pp-test-19"] = {"build":"odir",
+                           "note":['multifile project', 'multiple src/', 'ignore mod',
+                                   'build specified', 'nested #ifdef & neither defined',
+                                   '#define inside #ifdef']}
+    tests["pp-test-20"] = {"build":"odir",
+                           "note":['multifile project', 'multiple src/', 'ignore mod',
+                                   'build specified', 'nested #ifdef & one defined',
+                                   '#define inside #ifdef (never reached)']}
 
     verbose = True
     print_dependencies = False

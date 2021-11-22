@@ -1,10 +1,3 @@
-#
-# This file is generated automatically. DO NOT EDIT!
-#
-#
-#: build_dir = build
-#
-#
 #: test-8/data_types.f90
 build/data_types.o : test-8/data_types.f90
 #: test-8/src2/vars.f90

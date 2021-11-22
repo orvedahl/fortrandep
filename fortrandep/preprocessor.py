@@ -91,10 +91,12 @@ class FortranPreprocessor:
                  with the exception of any if blocks
             + #ifdef VARIABLE : only if-endif or if-else-endif blocks, no elif statements
             + #ifndef VARIABLE : only if-endif or if-else-endif blocks, no elif statements
+            + #define VAR VALUE : function definitions are not supported
 
         In the case of if blocks, the "correct" code is included, the "invalid" code
         is simply ignored and not retained. For include directives, the included file
-        contents are simply copied over, it is not processed for more directives (except if-endif).
+        contents are simply copied over, it is not processed for more #include directives,
+        but if blocks and define directives are parsed.
 
         Args
         ----
@@ -122,41 +124,61 @@ class FortranPreprocessor:
 
         return contents
 
-    def _parse_define_directives(self, text):
+    def _parse_define_directives(self, text, return_count=False):
         """
-        Parse Fortran file for define directives
+        Parse Fortran file for define directives outside of any if statements
 
         Args
         ----
         text : list
             Text of the file to parse; each entry in the list is a line in the file
+        return_count : bool, optional
+            Return the number of macros that were defined
 
         Returns
         -------
         contents : list
             The preprocessed file contents; each entry in the list is a line
+        count : int, optional
+            The number of macros that were found, only returned if return_count=True
         """
         contents = []
+        if_count = 0
+        count = 0
         for i,Line in enumerate(text):
             line = Line.lower()
-            if (line.lstrip().startswith("#define")):
-                ind = line.find("define") # extract the macro name and value
-                entry = Line[ind+len("define"):].strip()
+            if (line.lstrip().startswith("#if")):
+                if_count += 1
+            if (line.lstrip().startswith("#endif")):
+                if_count -= 1
+
+            # parse #define directives, only if they appear outside of an #if statement
+            if (line.lstrip().startswith("#define") and (if_count < 1)):
+                ind = line.find("define")
+                entry = Line[ind+len("define"):].strip() # entry: name value
                 values = entry.split(maxsplit=1)
-                name = values[0]
+                name = values[0].strip()
                 if (len(values) == 1):
                     value = 1
                 else:
-                    value = values[1]
+                    value = values[1].strip()
 
                 self.define("{}={}".format(name,value))
+                count += 1
             else:
                 contents.append(Line)
-        return contents
+
+        if (return_count):
+            return contents, count
+        else:
+            return contents
 
     def _parse_if_directives(self, text):
         """
-        Parse Fortran file for if directives and choose proper code block
+        Parse Fortran file for #ifdef and #ifndef directives and choose proper code block.
+
+        Only simple if blocks of the form if-else-endif are supported, the #elif directive
+        is not supported. If statements may contain #include and #define directives.
 
         Args
         ----
@@ -169,89 +191,127 @@ class FortranPreprocessor:
             The preprocessed file contents; each entry in the list is a line
         """
         contents = []
-        indices = {"ifs":[], "endif":[]}
+        ifs = []
+        idx_if = -1
+        active_if = []
+        Nif = 0
+        Nendif = 0
 
         # find the start/end indices of each if block
         for i,Line in enumerate(text):
             line = Line.lower()
             if (line.lstrip().startswith("#")):
 
-                if (("ifdef" in line) or ("ifndef" in line) or ("#if" in line)):
-                    indices["ifs"].append(i)
+                if (("#ifdef" in line) or ("#ifndef" in line) or ("#if" in line)):
+                    idx_if += 1              # list index that identifies this if block
+                    active_if.append(idx_if) # track "active" if blocks
+                    ifs.append([i])          # store line number as new entry
+                    Nif += 1
 
-                if ("endif" in line):
-                    indices["endif"].append(i)
+                if ("#else" in line):
+                    try:
+                        idx = active_if[-1] # index of current if block
+                    except:
+                        e = "ERROR: parsing #else failed, possible missing #if?"
+                        raise ValueError(e)
+                    ifs[idx].append(i)  # store line number to existing entry
 
-        if (len(indices["ifs"]) != len(indices["endif"])):
-            e = "ERROR: mismatch between if and endif statements, {} ifs and {} endifs"
-            raise SyntaxError(e.format(len(indices["ifs"]), len(indices["endif"])))
+                if ("#endif" in line):
+                    try:
+                        idx = active_if[-1] # index of current if block
+                    except:
+                        e = "ERROR: parsing #endif failed, possible missing #if?"
+                        raise ValueError(e)
+                    ifs[idx].append(i)  # store line number to existing entry
+                    del active_if[-1]   # mark if block as "parsed" by removing from active
+                    Nendif += 1
 
-        # extract if/endif index lists into collection of paired indices
-        # for example:
-        #     ...
-        #     #ifdef 1       line 17 (rather arbitrary line numbers...)
-        #        ...
-        #        #ifdef 2    line 23
-        #           ...
-        #        #endif 2    line 27
-        #        ...
-        #        #ifdef 3    line 35
-        #           ...
-        #        #endif 3    line 40
-        #        ...
-        #     #endif 1       line 50
-        #     ...
-        # produces: indices["ifs"] = [17, 23, 35] & indices["endif"] = [27, 40, 50]
-        # iterate over ifdef indices in reverse, i.e., start with line 35. The
-        # corresponding endif index will be the first endif index that is larger
-        # than 35, i.e., 40. Now remove 40 from the list. The second-to-last ifdef
-        # index, 23, will have corresponding endif index that is the first endif index
-        # larger than 23 of the remaining endif indices, which is 27. Remove 27 from the
-        # list, which only leaves endifs = [50]. The last ifdef index, 17, will be the
-        # first index that is larger than 17 of those that remain, i.e., 50. So the
-        # proper ifdef/endif pairs would be: [(35,40), (23,27), (17,50)]
-        if_index_pairs = []
-        for i in indices["ifs"][::-1]:
-            start_if = i
-
-            # find all endif indices larger than start, and sort them
-            end_ifs = [x for x in indices["endif"] if x > start_if]
-            end_ifs.sort()
-
-            # extract the first index that is larger than start and remove it
-            end_if = end_ifs[0]
-            indices["endif"].remove(end_if)
-
-            if_index_pairs.append([start_if, end_if]) # shape (Nifs, 2)
+        if (Nif != Nendif):
+            e = "ERROR: unmatched #if-#endif statements, found {} ifs and {} endifs"
+            raise SyntaxError(e.format(Nif, Nendif))
 
         parsed_text = text.copy() # avoid changing the input by using a copy, not a reference
 
-        # process the ifdef/ifndef directives
-        Nifs = len(if_index_pairs)
-        for i in range(Nifs):
+        # process the if directives
+        for i in range(Nif):
 
-            start = if_index_pairs[i][0] # index to #if...
-            end = if_index_pairs[i][1]   # index to #endif
+            if_idx = ifs[i] # process if blocks in order, going from top to bottom
 
-            if_text = parsed_text[start:end+1] # include the #endif line
+            if (len(if_idx) < 2): continue # this block is never reached based on directives
 
-            use_code, Nremoved = self._parse_single_if(if_text)
+            istart = if_idx[0]  # index to #if...
+            iend   = if_idx[-1] # index to #endif
+
+            # full text for this if block, including the #endif line
+            if_text = parsed_text[istart:iend+1] # include the #endif line
+
+            # convert the index of the #else directive to reference the extracted if block
+            if (len(if_idx) == 3):
+                ielse = if_idx[1] - istart
+            else:
+                ielse = None
+            results = self._parse_single_if(if_text, ielse)
+
+            use_code, Nremoved, index_threshold, used_first_block = results
 
             # swap out the if statement text for the correct code
-            parsed_text = parsed_text[:start] + use_code + parsed_text[end+1:]
+            parsed_text = parsed_text[:istart] + use_code + parsed_text[iend+1:]
 
-            # code length has changed so update the remaining if indices
-            for j in range(i+1,Nifs):
-                s = if_index_pairs[j][0]
-                e = if_index_pairs[j][1]
-                if (s > end):
-                    if_index_pairs[j][0] = s - Nremoved
-                if (e > end):
-                    if_index_pairs[j][1] = e - Nremoved
+            # now update the remaining if block indices, as necessary, since the
+            # number of lines of text has been modified
+
+            # index_threshold = local index that divides if block into
+            # "should be kept" and "should be ignored" sections, make it a global index
+            index_threshold += istart
+
+            # only adjust entries for if blocks that have not yet been processed
+            for j in range(i+1,Nif):
+                if (len(ifs[j]) < 1): continue # these have already been processed
+
+                s = ifs[j][0] # start index to other, not yet processed, if blocks
+
+                # this j-th block is either 1) inside the first i-th block, inside
+                # the second i-th block, or completely after the i-th block.
+                # determine what case the j-th block is and choose the necessary
+                # adjustment for its indices
+
+                # this j-th block is inside the first block
+                case1 = used_first_block and (s < index_threshold)
+
+                # this j-th block is inside the second block
+                case2 = (not used_first_block) and (s > index_threshold) and (s < iend)
+
+                # this j-th block is beyond the entire block
+                case3 = s > iend
+
+                Nadjust = 0 # default is to adjust nothing, should never happen though...
+
+                # there were N lines removed, but one of those is the last #endif,
+                # which occurs after these indices, so do not adjust for the last #endif
+                # line, only the first #if line
+                if (case1):
+                    Nadjust = 1
+
+                # there were N lines removed, but one of those is the last #endif,
+                # which occurs after these indices, so do not adjust for the last #endif line
+                if (case2):
+                    Nadjust = Nremoved - 1
+
+                # there were N lines removed, all of which occured before this block
+                if (case3):
+                    Nadjust = Nremoved
+
+                # this block should be kept, but adjusted
+                if (case1 or case2 or case3):
+                    for k in range(len(ifs[j])): # adjust all indices of the j-th block
+                        ifs[j][k] -= Nadjust
+
+                else: # these blocks are no longer relevent, remove them
+                    ifs[j].clear()
 
         return parsed_text
 
-    def _parse_single_if(self, text):
+    def _parse_single_if(self, text, ielse):
         """
         Parse single ifdef/ifndef block and return the valid code that should be used
 
@@ -266,17 +326,15 @@ class FortranPreprocessor:
             #else
                 code_3
             #endif
-        and
-            #if defined(VARIABLE)
-                code_4
-            #endif
-        In these examples, if VARIABLE is defined, then code_1, code_3, and code_4 will be returned.
-        If VARIABLE is not defined, then only code_2 will be returned, other code_? would be ignored.
+        In these examples, either code_1 and code_3 will be returned, or code_2 will
+        be returned; unused code is silently ignored.
 
         Args
         ----
         text : list
-            Text of the if block to parse, starting with "#if..." and concluding with "#endif"
+            Text of the if block to parse, starting with "#if" and concluding with "#endif"
+        ielse : int or None
+            Index into text of the "#else# statement, should be None if no else is present.
 
         Returns
         -------
@@ -284,55 +342,65 @@ class FortranPreprocessor:
             The valid code contents where unused code has been removed
         Nremoved: int
             The number of lines that were ignored from the input list.
+        index_threshold : int
+            Index into input text that separates it into the True block and the False block.
+        used_first_block : bool
+            A boolean value describing which block of the if-else-endif block that was used.
         """
         Ninput = len(text)
 
-        if (Ninput < 1): # input is empty, so return empty
-            return [], 0
+        if (Ninput < 1): # input is empty
+            raise ValueError("ERROR: Cannot parse single-if, line is empty")
 
         name = None
         if_type = None
+        if (ielse is None):
+            index_threshold = Ninput-1
+        else:
+            index_threshold = ielse
 
-        first_block = []
-        second_block = []
-        for Line in text:
-            line = Line.lower()
-            if (line.lstrip().startswith("#if")):
-                first = True
-                if ("ifndef" in line):
-                    if_type = 'ndef'
-                    ind = line.find("ifndef") # extract the macro variable name
-                    name = Line[ind+len("ifndef"):].strip()
-                elif ("ifdef" in line):
-                    if_type = 'def'
-                    ind = line.find("ifdef") # extract the macro variable name
-                    name = Line[ind+len("ifdef"):].strip()
+        fLine = text[0]
+        fline = text[0].lower()
 
-                continue
+        # check first line for if statement and parse it
+        if ("ifndef" in fline):
+            if_type = 'ndef'
+            ind = fline.find("ifndef") # extract the macro variable name
+            name = fLine[ind+len("ifndef"):].strip()
+        elif ("ifdef" in fline):
+            if_type = 'def'
+            ind = fline.find("ifdef") # extract the macro variable name
+            name = fLine[ind+len("ifdef"):].strip()
+        else:
+            e = "ERROR: Cannot parse single-if, it has no #if statement"
+            e += "\n\tfirst line = {}".format(fline)
+            raise ValueError(e)
 
-            if (line.lstrip().startswith("#") and "else" in line):
-                first = False
-                continue
-
-            if (not line.lstrip().startswith("#")): # skip all other directives...very basic
-                if (first):
-                    first_block.append(Line)
-                else:
-                    second_block.append(Line)
+        if (not text[-1].lower().lstrip().startswith("#endif")):
+            e = "ERROR: Cannot parse single-if, it has no #endif statement"
+            e += "\n\tlast line = {}".format(text[-1])
+            raise ValueError(e)
 
         # determine if the macro is defined
         is_defined = name in self.macros.keys()
 
         # select the proper block of code
-        if (((if_type == "def") and is_defined) or ((if_type == "ndef") and (not is_defined))):
-            use_first = True
+        first_def_block  = ((if_type == "def") and is_defined)
+        first_ndef_block = ((if_type == "ndef") and (not is_defined))
+        if (first_def_block or first_ndef_block):
+            block = text[1:index_threshold]
+            used_first_block = True
         else:
-            use_first = False
+            block = text[index_threshold+1:-1]
+            used_first_block = False
 
-        if (use_first):
-            return first_block, Ninput - len(first_block)
-        else:
-            return second_block, Ninput - len(second_block)
+        Nremoved = Ninput - len(block)
+
+        # now find and parse any #define directives that do not appear in any other if blocks
+        contents, count = self._parse_define_directives(block, return_count=True)
+        Nremoved += count
+
+        return contents, Nremoved, index_threshold, used_first_block
 
     def _parse_include_directives(self, text):
         """
