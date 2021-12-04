@@ -209,7 +209,7 @@ else
   objects_file := $(tdir)/fortran.objects
 endif
 
-# where to look for each type of file extension
+# where to look for each type of file extension, keep "." to find probin/build_info
 vpath %.f90 . $(vpath_loc)
 vpath %.F90 . $(vpath_loc)
 
@@ -234,7 +234,8 @@ $(dep_file): $(internal_f90sources) $(f90sources)
 	@echo ""
 else
 # go find the source files, then build the dependencies
-# make sure the probin/build_info are included and explicitly include "." source dir
+#    make sure the probin/build_info are included using internal_f90sources
+#    only include source directories specified by the user in src_dirs
 $(dep_file): $(internal_f90sources) $(src_dirs)
 	@if [ ! -d $(tdir) ]; then mkdir -p $(tdir); fi
 	@echo ""
@@ -247,7 +248,7 @@ $(dep_file): $(internal_f90sources) $(src_dirs)
 		--build=$(odir)/ \
 	        --find-source --extensions=".f90 .F90" \
 	        --add-files="$(internal_f90sources)" \
-		"." $(src_dirs)
+		$(src_dirs)
 	@echo ""
 	@echo "${bold}Writing list of object Files ...${normal}"
 	$(python_exe) $(scripts_dir)/find_objects.py $(dep_file) $(objects_file)
