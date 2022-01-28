@@ -1,0 +1,79 @@
+#
+# Standalone Makefile stencil, does not rely on FortranDep machinery
+#
+
+##########################################################################
+# user input
+##########################################################################
+debug :=
+executable := main.exe
+
+##########################################################################
+# compiler flags (using GCC as an example)
+##########################################################################
+linker := gfortran
+compiler := gfortran
+
+ifdef debug
+  flags := -O0 -g -fbounds-check -ffpe-trap=invalid,zero,overflow -fbacktrace -ffixed-line-length-132
+else
+  flags := -O3 -ffixed-line-length-132
+endif
+
+include_flags := -I$(HOME)/bin/include
+library_flags := -L$(HOME)/bin/lib -lcustom
+
+all: $(executable)
+
+##########################################################################
+# source files
+##########################################################################
+source := file1.f90
+source += file2.f90
+
+objects := $(source:.f90=.o)
+
+##########################################################################
+# dependencies of the form
+#     target : dependency/prerequisites
+##########################################################################
+file1.o : file2.o
+file1.o : file1.f90
+file2.o : file2.f90
+
+##########################################################################
+# rules to build objects and executable
+#     $@ = the file that will be made, i.e., the target
+#     $? = all prerequisites newer than the target
+#     $^ = all prerequisites with full directory paths
+#     $< = name of file that caused the action
+#     $* = the prefix shared by target and dependent files
+##########################################################################
+%.o: %.f90
+	@echo "Building $< ..."
+	$(compiler) $(flags) $(include_flags) -c $< -o $@
+
+$(executable): $(objects)
+	@echo "Linking $< ..."
+	$(linker) $(flags) $(include_flags) -o $(executable) $(objects) $(library_flags)
+
+##########################################################################
+# cleanup
+##########################################################################
+.PHONY: clean realclean all
+
+clean:
+	-rm -f ./*.o
+	-rm -f ./*.mod
+
+realclean: clean
+	-rm -f $(executable)
+
+purge: realclean
+	-rm -f ./*.exe
+
+##########################################################################
+# debug aide, typing "make print-flags" will print the variable's contents
+##########################################################################
+print-%: ; @echo $* is $($*)
+
