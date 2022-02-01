@@ -100,13 +100,25 @@ Adding search paths
 for where to find included files is done through the `pp_search_paths` variable. Macros
 can be defined with the `pp_macros` variable. These variables control the preprocessor
 used for determining the dependencies, not the preprocessor invoked by the compiler. As
-a result, defining macros is best accomplished as:
+a result, defining macros must appear in two places:
 ```
 # set macros for dependency checker
 pp_macros := INTEL_COMPILER=1 OUTPUT_DIR=/home/user
 
 # set same macros for actual preprocessor in the form of compiler flags
 xtr_f90_flags += -DINTEL_COMPILER=1 -DOUTPUT_DIR=/home/user
+```
+The best practice is to use an auxilary variable to define the macros and be sure
+the auxilary variable is applied to both the dependency checker as well as the compiler:
+```
+# user-defined macros
+defined_macros := INTEL_COMPILER=1 OUTPUT_DIR=/home/user
+
+# make sure the dependency checker has the definitions
+pp_macros := $(defined_macros)
+
+# make sure the compiler (and the preprocessor) have the definitions
+xtr_f90_flags += $(addprefix -D, $(defined_macros))
 ```
 
 #### Automatic Input Parameters
