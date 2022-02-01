@@ -50,7 +50,7 @@ A stencil for such a minimal makefile is provided in the `Makefiles` directory n
 description are provided in `GNUmakefile.stencil`. Some of the more important options
 are described below.
 
-### Specifying Source Files
+#### Specifying Source Files
 There are two ways to choose what source files will be included in the build. The default method
 will automatically find and process the source files based on the specified source directories.
 All files with the `*.f90` and `*.F90` suffix will be included. This can lead to processing
@@ -75,13 +75,13 @@ use the `sf90sources` variable will not go through the dependency checker, but w
 included. Only files found in the `f90sources` and `sf90sources` variables will be included
 in the project.
 
-### Skipping Modules
+#### Skipping Modules
 Sometimes a system module is "used", such as OpenMP or MPI. The dependency checker will try
 to find a file that contains a definition of such modules unless you tell it not to look.
 This is where the `skip_modules` variable comes in handy. It is a space-separated list of
 modules that should be ignored by the dependency checker.
 
-### Compiler Flags
+#### Compiler Flags
 There are six important variables that control the compiler flags:
 
 * `f90_compiler` - choose a particular compiler: `intel`, `gcc`, or `pgi`
@@ -94,7 +94,7 @@ There are six important variables that control the compiler flags:
 If the various flag variables are not set, suitable defaults are chosen based on the
 chosen compiler.
 
-#### Preprocessor
+###### Preprocessor
 There are two variables related to the preprocessor used by the dependency checker.
 Adding search paths
 for where to find included files is done through the `pp_search_paths` variable. Macros
@@ -109,7 +109,7 @@ pp_macros := INTEL_COMPILER=1 OUTPUT_DIR=/home/user
 xtr_f90_flags += -DINTEL_COMPILER=1 -DOUTPUT_DIR=/home/user
 ```
 
-### Automatic Input Parameters
+#### Automatic Input Parameters
 When choosing `build_probin := t`, a module that handles namelist values is generated.
 The module handles reading the namelist as well as parsing the command line in order
 to override any values specified in the namelist. The module name is set to be
@@ -148,11 +148,18 @@ or
 The namelist file must be either the first or the last argument. All other parameters are
 set using the typical two dashes syntax with no equals sign.
 
-### Build Information
+#### Build Information
 When choosing `build_info := t`, a module is generated that contains various information
 concerning the build, including date, directory, machine name, compiler, compiler version,
 compiler flags, linking flags, and the git hash of the build directory. This information
 can then be used from within Fortran and included in various output formats.
+
+#### Scipt to Generate Dependencies
+Within the `/path/to/FortranDep/bin/` directory, the main script for generating the
+dependency file is named `generate_dependencies.py`. This script is automatically called
+within the larger makefile machinery. It is quite flexible with many options; use the
+`--help` flag to see the details, or search the `/path/to/FortranDep/Makefiles/GMain.mak`
+file for the string `dep_script` to see how it is used within a makefile.
 
 ## Preprocessor
 
@@ -160,7 +167,7 @@ The preprocessor is written in pure Python and does not require any third-party 
 a result, it does not support all possible preprocessor directives and their complexities.
 Supported directives include:
 
-### Include Statements
+#### Include Statements
 Including code from other files is supported in the form
 ```
 #include 'filename'
@@ -169,7 +176,7 @@ Nested `#include`s are not supported, i.e., an included file cannot have another
 statement. All supported if-else-endif statements can appear in the included file. Also
 supported are any `#define` statements, but there are some restrictions.
 
-### Define Statments
+#### Define Statments
 Defining macros using the `#define <name> <value>` form is supported. Only simple
 "substitution" type macros are supported. Macros such as function definitions are not yet
 supported. Conditional definitions are fully supported, for example:
@@ -183,7 +190,7 @@ supported. Conditional definitions are fully supported, for example:
 #endif
 ```
 
-### If Statements
+#### If Statements
 Standard `#ifdef - #else - #endif` statements as well as the `#ifndef` variation are
 supported. More complex `#elif` statements are not supported. The if statements can be
 nested, for example:
@@ -199,7 +206,7 @@ nested, for example:
 #endif
 ```
 
-### Important Notes
+#### Important Notes
 The directives are processed in a particular order which has important implications for
 understanding and fixing bugs. The order-of-operations is:
 
@@ -213,7 +220,7 @@ As a result of this ordering, included files can only use `#ifdef`, `#ifndef`, a
 directives. The only supported directives that may appear inside an if statement are:
 other if blocks, `#include` directives, and `#define` directives.
 
-### Example Usage
+#### Example Usage
 To use the preprocessor, make sure the path to the `fortrandep` directory is included in
 your `PYTHONPATH`. Then simply import the preprocessor as:
 ```
@@ -269,6 +276,12 @@ parsed_lines = fpp.parse(lines)
 ```
 The returned `parsed_lines` will be a list where each entry is a line of source code.
 
+#### Script to Preprocess Single Files
+Within the `/path/to/FortranDep/bin` directory, there is a python script named
+`preprocess_file.py`. This script can be used to preprocess a source file and write the
+parsed lines to another file. There are options for specifying macros as well as the
+search paths, use the `--help` flag to see the details.
+
 ## Available Test Suites
 During the ongoing development of this project, multiple test cases were used to test
 the accuracy. The `test/` directory contains a bunch of source tree variations and the
@@ -284,7 +297,7 @@ This will generate the `depends.mak` file for each test case and compare it agai
 corresponding `solution.mak` file. Successful cases will print `Pass` on the screen and
 unsuccessful cases will show `Fail`.
 
-### Add a New Case (only for developers)
+#### Add a New Case (only for developers)
 To include a new test case:
 
 * build a new directory under the `tests` directory and include any source files and
