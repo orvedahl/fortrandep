@@ -94,7 +94,7 @@ There are six important variables that control the compiler flags:
 If the various flag variables are not set, suitable defaults are chosen based on the
 chosen compiler.
 
-###### Preprocessor
+##### Preprocessor
 There are two variables related to the preprocessor used by the dependency checker.
 Adding search paths
 for where to find included files is done through the `pp_search_paths` variable. Macros
