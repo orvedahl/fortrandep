@@ -1,0 +1,8 @@
+
+The src/main.f90 file contains a nested #ifdef, one of which contains a #define,
+as well as an #include statement.
+
+The included test_all.sh script will run multiple combinations of the bin/preprocess.py
+script on the src/main.f90 file. It will write out files named "test?.f90" and each one
+should be inspected for accuracy. The expected result is displayed before each case is run.
+

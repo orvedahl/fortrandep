@@ -49,7 +49,7 @@ class FortranPreprocessor:
             A definition should take the form "name=value" or just "name" for boolean values
         """
         if ("=" in definition):
-            temp = definition.split("=")
+            temp = definition.split("=",maxsplit=1)
             name = temp[0].strip()
             value = temp[1].strip()
         else:
@@ -437,7 +437,7 @@ class FortranPreprocessor:
                 # find first instance of included file that is in the path
                 filename = filenames[exists.index(True)]
                 with open(filename) as mf:
-                     include_contents = mf.read().splitlines()
+                     include_contents = mf.readlines()
 
                 # simple dump of include file into the current file
                 contents.extend(include_contents)
