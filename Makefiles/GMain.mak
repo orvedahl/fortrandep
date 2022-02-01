@@ -318,10 +318,10 @@ clean::
 
 realclean:: clean
 	$(RM) -rf $(tname)
-	$(RM) -f $(exe)
 
 # somewhat dangerous, depending on what other files there are
 purge: realclean
+	$(RM) -f $(exe)
 	$(RM) -f ./*.exe
 
 #----------------------------------------------------------------
