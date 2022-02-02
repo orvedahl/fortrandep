@@ -14,7 +14,7 @@ There are two main tools:
 
 with many supporting scripts to help with the build process that are used in the background.
 
-The original idea is based on the [fort_depend](https://github.com/ZedThree/fort_depend.py)
+Some of the machinery is based on the [fort_depend](https://github.com/ZedThree/fort_depend.py)
 project, although here we use a custom preprocessor that relies on pure Python.
 
 ## Makefiles
