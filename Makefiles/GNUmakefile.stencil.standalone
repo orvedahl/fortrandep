@@ -1,45 +1,77 @@
 #
 # Standalone Makefile stencil, does not rely on FortranDep machinery
 #
+# Requires:
+#     -explicit listing of source files, including locations, order matters
+#     -explicit listing of file dependencies
 
 ##########################################################################
 # user input
 ##########################################################################
 debug :=
 executable := main.exe
+build_dir := _build
 
 ##########################################################################
 # compiler flags (using GCC as an example)
 ##########################################################################
+# these should be the actual commands, not the name
 linker := gfortran
 compiler := gfortran
 
+# flags that will always be included, regardless of debug state
+xtr_flags :=
+
+# debug/optimization flags
 ifdef debug
   flags := -O0 -g -fbounds-check -ffpe-trap=invalid,zero,overflow -fbacktrace -ffixed-line-length-132
+
+  # within the build directory, place compiled objects into a subdirectory
+  sub_dir := dbg
 else
   flags := -O3 -ffixed-line-length-132
+  sub_dir := opt
 endif
+flags += $(xtr_flags)
 
-include_flags := -I$(HOME)/bin/include
+# store object files and module files inside the build directory
+odir = $(build_dir)/$(sub_dir)/o
+mdir = $(build_dir)/$(sub_dir)/m
+
+# be sure to tell compiler where to put compiled module files and where to look for them
+include_flags := -I$(HOME)/bin/include -J$(mdir) -I$(mdir)
 library_flags := -L$(HOME)/bin/lib -lcustom
 
+##########################################################################
+# first rule tells make what to build by default
+##########################################################################
 all: $(executable)
 
 ##########################################################################
-# source files
+# source files, including relative path. ORDER MATTERS
 ##########################################################################
-source := file1.f90
-source += file2.f90
+source := src/file1.f90
+source += src2/file2.f90
 
-objects := $(source:.f90=.o)
+# extract object files using three step process in one line
+#     1) strip off the leading path for each file --- $(notdir full_paths)
+#     2) change extensions from .f90 to .o --- $(files:.f90=.o)
+#     3) add prefix of object directory to each file --- $(addprefix $(odir)/, files)
+objects := $(addprefix $(odir)/, $($(notdir $(source)):.f90=.o))
 
 ##########################################################################
 # dependencies of the form
 #     target : dependency/prerequisites
+#
+# all object files depend on the original source file as:
+#     $(odir)/file1.o : /relative/path/to/file1.f90
+#
+# object files that depend on other object files should appear as:
+#     $(odir)/file1.o : $(odir)/file2.o
 ##########################################################################
-file1.o : file2.o
-file1.o : file1.f90
-file2.o : file2.f90
+$(odir)/file1.o : $(odir)/file2.o
+$(odir)/file1.o : src/file1.f90
+$(odir)/file2.o : src2/file2.f90
 
 ##########################################################################
 # rules to build objects and executable
@@ -49,28 +81,32 @@ file2.o : file2.f90
 #     $< = name of file that caused the action
 #     $* = the prefix shared by target and dependent files
 ##########################################################################
-%.o: %.f90
+$(odir)/%.o: %.f90
 	@echo "Building $< ..."
-	$(compiler) $(flags) $(include_flags) -c $< -o $@
+	$(compiler) $(flags) -c $< -o $@ $(include_flags)
 
 $(executable): $(objects)
 	@echo "Linking $< ..."
-	$(linker) $(flags) $(include_flags) -o $(executable) $(objects) $(library_flags)
+	$(linker) $(flags) -o $(executable) $(objects) $(library_flags) $(include_flags)
+	@echo
+	@echo "SUCCESS"
+	@echo
 
 ##########################################################################
 # cleanup
 ##########################################################################
-.PHONY: clean realclean all
+.PHONY: clean realclean all purge
 
 clean:
-	-rm -f ./*.o
-	-rm -f ./*.mod
+	-rm -f $(odir)/*.o
+	-rm -f $(mdir)/*.mod
 
 realclean: clean
-	-rm -f $(executable)
+	-rm -f $(build_dir)
 
 purge: realclean
-	-rm -f ./*.exe
+	-rm -f $(executable)
+	-rm -f $(executable)*
 
 ##########################################################################
 # debug aide, typing "make print-flags" will print the variable's contents

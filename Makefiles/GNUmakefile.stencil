@@ -117,7 +117,7 @@ build_dir := _build
 sub_dir :=
 
 # Set compiler flags manually or leave blank to use defaults. Defaults
-# only exist for Intel and GNU compilers.
+# only exist for Intel, GNU, and NVIDIA HPC compilers.
 # If manually setting, a useful block to include will be
 #     ifdef debug
 #       f90_flags := <set debug flags here>
@@ -129,7 +129,7 @@ f90_flags :=
 # Include the OpenMP compiler flag, only used if f90_flags is not set
 OMP :=
 
-# Include extra flags (these will always be added on)
+# Include extra flags (these will always be added on, regardless of debug state)
 xtr_f90_flags :=
 
 # Set include directories, e.g., -I<some dir>
@@ -141,13 +141,27 @@ library_flags :=
 #-------------------------------------------------------------------------
 # Preprocessor Settings
 #-------------------------------------------------------------------------
-# Space-separated list of places where the preprocessor can find "#include" files
-pp_search_paths :=
+# these settings are specific to the python dependency checker, not the "actual"
+# preprocessor that is called before compiling each file. The python script needs
+# to know what macros have been defined and where to find included files in order
+# to determine what code to parse. The defined macros and search paths must still
+# be sent to the compiler, therefore a useful block to use will be
+#     # user defined macros
+#     defined_macros := INTEL_COMPILER=1 OUTPUT_DIR=/home/user/
+#
+#     # tell python the macro definitions
+#     pp_macros := $(defined_macros)
+#
+#     # tell C-preprocessor the macro definitions, most compilers use "-Dvariable=value"
+#     xtr_f90_flags += $(addprefix -D, $(defined_macros))
 
 # Space-separated list of user defined preprocessor macros
 # each macro should be name=value, with no spaces, for example
 #     pp_macros := INTEL_COMPILER=1 OUTPUT_DIR=/home/user/
 pp_macros :=
+
+# Space-separated list of places where the preprocessor can find "#include" files
+pp_search_paths :=
 
 ##########################################################################
 # include the rest of the Makefile

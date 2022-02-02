@@ -15,7 +15,7 @@ There are two main tools:
 with many supporting scripts to help with the build process that are used in the background.
 
 The original idea is based on the [fort_depend](https://github.com/ZedThree/fort_depend.py)
-project, although here we use a custom preprocessor that relies on pure Python
+project, although here we use a custom preprocessor that relies on pure Python.
 
 ## Makefiles
 The core makefile magic includes a script to automatically determine the depenencies
@@ -47,8 +47,16 @@ include $(MAKEFILE_HOME_DIR)/GMain.mak
 ```
 A stencil for such a minimal makefile is provided in the `Makefiles` directory named
 `GNUmakefile.stencil.minimal`. All possible variables that the user can change and their
-description are provided in `GNUmakefile.stencil`. Some of the more important options
-are described below.
+description are provided in the more extensive `GNUmakefile.stencil`. Some of the more
+important options are described below.
+
+Also included is a stencil for a standalone makefile that does not rely on the `FortranDep`
+machinery, named `GNUmakefile.stencil.standalone`. This can be used for smaller projects
+or systems that do not support python scripts. It is meant to be a fully self-contained
+makefile that shares some nice features of the full setup. Nothing is done automatically,
+i.e., no autogenerating the list of source files, no automatic dependency checker. The
+`GNUmakefile.stencil.standalone` serves more as a template for a typical makefile, with
+some sophisticated features.
 
 #### Specifying Source Files
 There are two ways to choose what source files will be included in the build. The default method
@@ -95,17 +103,17 @@ If the various flag variables are not set, suitable defaults are chosen based on
 chosen compiler.
 
 ##### Preprocessor
-There are two variables related to the preprocessor used by the dependency checker.
+There are two variables related to the python preprocessor used by the dependency checker.
 Adding search paths
 for where to find included files is done through the `pp_search_paths` variable. Macros
-can be defined with the `pp_macros` variable. These variables control the preprocessor
-used for determining the dependencies, not the preprocessor invoked by the compiler. As
+can be defined with the `pp_macros` variable. These variables control the python preprocessor
+used for determining the dependencies, not the C preprocessor invoked by the compiler. As
 a result, defining macros must appear in two places:
 ```
-# set macros for dependency checker
+# set macros for python dependency checker
 pp_macros := INTEL_COMPILER=1 OUTPUT_DIR=/home/user
 
-# set same macros for actual preprocessor in the form of compiler flags
+# set same macros for actual C preprocessor in the form of compiler flags
 xtr_f90_flags += -DINTEL_COMPILER=1 -DOUTPUT_DIR=/home/user
 ```
 The best practice is to use an auxilary variable to define the macros and be sure
@@ -114,10 +122,10 @@ the auxilary variable is applied to both the dependency checker as well as the c
 # user-defined macros
 defined_macros := INTEL_COMPILER=1 OUTPUT_DIR=/home/user
 
-# make sure the dependency checker has the definitions
+# tell python the macro definitions
 pp_macros := $(defined_macros)
 
-# make sure the compiler (and the preprocessor) have the definitions
+# tell C preprocessor the macro definitions using "-Dvariable=value" compiler flags
 xtr_f90_flags += $(addprefix -D, $(defined_macros))
 ```
 
