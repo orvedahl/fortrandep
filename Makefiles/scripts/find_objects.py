@@ -7,7 +7,7 @@ from __future__ import print_function
 import sys
 import os
 
-def find_objects(dependency_file, output_file):
+def find_objects(dependency_file, output_file, c_objects):
 
     objects = []
 
@@ -37,10 +37,15 @@ def find_objects(dependency_file, output_file):
     with open(output_file, "w") as f:
         f.write("#\n# This file is generated automatically. DO NOT EDIT!\n#\n")
         f.write("objects :=\n")
+        if (c_objects is not None):
+            for obj in c_objects:
+                f.write("objects += {}\n".format(obj))
         for obj in objects:
             f.write("objects += {}\n".format(obj))
 
     # generate a space separated list and "return" it by printing
+    #if (c_objects is not None):
+    #    objects = c_objects + objects
     #list_objects = " ".join(objects)
     #print(list_objects)
 
@@ -50,4 +55,9 @@ if __name__ == "__main__":
 
     output_file = sys.argv[2]
 
-    find_objects(dependency_file, output_file)
+    if (len(sys.argv) > 2):
+        c_objects = sys.argv[3:]
+    else:
+        c_objects = None
+
+    find_objects(dependency_file, output_file, c_objects)

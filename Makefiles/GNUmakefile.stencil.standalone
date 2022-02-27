@@ -34,6 +34,10 @@ else
 endif
 flags += $(xtr_flags)
 
+# only used for C code, the flags could be wrapped within the debug construct above
+c_compiler := gcc
+c_flags := -O3
+
 # store object files and module files inside the build directory
 odir = $(build_dir)/$(sub_dir)/o
 mdir = $(build_dir)/$(sub_dir)/m
@@ -49,15 +53,21 @@ all: $(executable)
 
 ##########################################################################
 # source files, including relative path. ORDER MATTERS
+#     C code would be included here
+#     F90 code is not explicitly supported here, but is easy to add
 ##########################################################################
-source := src/file1.f90
-source += src2/file2.f90
+f90_source := src/file1.f90
+f90_source += src2/file2.f90
+
+c_source := src/file1.c
+c_source += src/file2.c
 
 # extract object files using three step process in one line
 #     1) strip off the leading path for each file --- $(notdir full_paths)
 #     2) change extensions from .f90 to .o --- $(files:.f90=.o)
 #     3) add prefix of object directory to each file --- $(addprefix $(odir)/, files)
-objects := $(addprefix $(odir)/, $($(notdir $(source)):.f90=.o))
+objects := $(addprefix $(odir)/, $($(notdir $(c_source)):.c=.o))
+objects += $(addprefix $(odir)/, $($(notdir $(f90_source)):.f90=.o))
 
 ##########################################################################
 # dependencies of the form
@@ -84,6 +94,10 @@ $(odir)/file2.o : src2/file2.f90
 $(odir)/%.o: %.f90
 	@echo "Building $< ..."
 	$(compiler) $(flags) -c $< -o $@ $(include_flags)
+
+$(odir)/%.o: %.c
+	@echo "Building $< ..."
+	$(c_compiler) $(c_flags) -c $< -o $@
 
 $(executable): $(objects)
 	@echo "Linking $< ..."

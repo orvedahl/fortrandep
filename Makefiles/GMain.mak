@@ -101,6 +101,11 @@ mdir = $(tdir)/m
 # find/include the GPackage.mak files
 #----------------------------------------------------------------
 f90sources :=
+ifndef c_sources
+  C_sources :=
+else
+  C_sources := $(c_sources)
+endif
 internal_f90sources :=
 GPack_fil :=
 vpath_loc :=
@@ -203,15 +208,26 @@ vpath_loc += $(src_dirs)
 #----------------------------------------------------------------
 # strip file extension, add ".o" suffix, sort & remove duplicates, then add "odir/" prefix
 ifdef find_GPackage_files
-  objects = $(addprefix $(odir)/, $(sort $(addsuffix .o, $(basename $(f90sources)))))
+  ifdef c_dependencies
+    objects = $(addprefix $(odir)/, $(addsuffix .o, $(basename $(C_sources))))
+    objects += $(addprefix $(odir)/, $(sort $(addsuffix .o, $(basename $(f90sources)))))
+  else
+    objects = $(addprefix $(odir)/, $(sort $(addsuffix .o, $(basename $(f90sources)))))
+  endif
   objects += $(addprefix $(odir)/, $(sort $(addsuffix .o, $(basename $(sf90sources)))))
 else
   objects_file := $(tdir)/fortran.objects
 endif
 
+# convert C source files to ".o" suffix and add "odir/" prefix
+ifdef c_dependencies
+  C_objects = $(addprefix $(odir)/, $(notdir $(addsuffix .o, $(basename $(C_sources)))))
+endif
+
 # where to look for each type of file extension, keep "." to find probin/build_info
 vpath %.f90 . $(vpath_loc)
 vpath %.F90 . $(vpath_loc)
+vpath %.c . $(vpath_loc)
 
 #----------------------------------------------------------------
 # rule to build the dependency file
@@ -251,7 +267,11 @@ $(dep_file): $(internal_f90sources) $(src_dirs)
 		$(src_dirs)
 	@echo ""
 	@echo "${bold}Writing list of object Files ...${normal}"
+ifdef c_dependencies
+	$(python_exe) $(scripts_dir)/find_objects.py $(dep_file) $(objects_file) $(C_objects)
+else
 	$(python_exe) $(scripts_dir)/find_objects.py $(dep_file) $(objects_file)
+endif
 	@echo ""
 clean::
 	$(RM) -f $(objects_file)
@@ -304,6 +324,13 @@ $(odir)/%.o: %.F90
 	@if [ ! -d $(mdir) ]; then mkdir -p $(mdir); fi
 	@echo "${bold}Building $< ...${normal}"
 	$(f90_comp) $(f90_compile) -c $< -o $@ $(include_flags)
+
+# include support for C code
+$(odir)/%.o: %.c
+	@if [ ! -d $(odir) ]; then mkdir -p $(odir); fi
+	@if [ ! -d $(mdir) ]; then mkdir -p $(mdir); fi
+	@echo "${bold}Building $< ...${normal}"
+	$(c_compiler) $(c_flags) -c $< -o $@
 
 #----------------------------------------------------------------
 # cleanup

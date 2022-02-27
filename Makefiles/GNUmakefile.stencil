@@ -74,6 +74,39 @@ find_GPackage_files :=
 ignore_files :=
 
 ##########################################################################
+# support for C code dependencies
+#     if using C code (c_dependencies := t), then the following are REQUIRED:
+#         c_sources    must manually provide source filenames (see below)
+#         c_compiler   must choose the C compiler executable
+#         c_flags      must set the C compiler flags
+##########################################################################
+# The Fortran project can include C code
+#     -C code will not be processed for dependencies of any kind
+#     -all C codes will be compiled before any Fortran code
+#     -C codes are compiled in order
+#
+# Specify if support for C code should be included
+c_dependencies :=
+
+# Specify the C source files, there are two options
+#     1) Within the GPackage.mak file by using
+#          c_sources += filename2.c
+#
+#     2) Manually within the GNUmakefile by setting the c_sources variable.
+#        The order of the files determines the compilation order
+#            c_sources := src/filename1.c filename2.c src_dir/filename3.c ...
+#c_sources :=
+
+# C compiler executable, e.g., gcc, icc, pgcc, etc.
+c_compiler :=
+
+# C compiler flags, include directories should be added here, but any
+# C-specific libraries for linking should be included in the Fortran
+# library_flags variable described below.
+#     c_flags := -g -O0 -I/custom/include ...
+c_flags :=
+
+##########################################################################
 # dependencies
 ##########################################################################
 # List of modules to skip when running through the automated dependency
